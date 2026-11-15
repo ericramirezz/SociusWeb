@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, AlertTriangle, Info } from 'lucide-react'
 import { bus, EVENTOS } from '../core'
+import { useIdioma } from '../i18n/IdiomaContext'
 
 // Observador (patrón Observer): se suscribe al bus de eventos y muestra un aviso.
 // El servicio de pedidos no sabe que este componente existe.
+// Cada evento produce un aviso; el texto se traduce con t() en el idioma activo.
 const MENSAJES = {
-  [EVENTOS.PAGADA]: (o) => ({ tipo: 'ok', texto: `Pago aprobado · orden ${o.id}` }),
-  [EVENTOS.AGENDADA]: (o) => ({ tipo: 'info', texto: `Arranque agendado para el ${o.fechaArranque}` }),
-  [EVENTOS.CANCELADA]: (o) => ({ tipo: 'info', texto: `Orden ${o.id} cancelada` }),
-  [EVENTOS.REEMBOLSADA]: (o) => ({ tipo: 'ok', texto: `Reembolso emitido · orden ${o.id}` }),
-  [EVENTOS.PAGO_RECHAZADO]: (d) => ({ tipo: 'error', texto: `${d.mensaje}. Intenta con otra tarjeta.` }),
-  [EVENTOS.LLAMADA_AGENDADA]: (l) => ({ tipo: 'ok', texto: `Llamada agendada: ${l.fecha} a las ${l.hora}` }),
+  [EVENTOS.PAGADA]: (o, t) => ({ tipo: 'ok', texto: t('notif.pagada', { id: o.id }) }),
+  [EVENTOS.AGENDADA]: (o, t, fecha) => ({ tipo: 'info', texto: t('notif.agendada', { fecha: fecha(o.fechaArranque) }) }),
+  [EVENTOS.CANCELADA]: (o, t) => ({ tipo: 'info', texto: t('notif.cancelada', { id: o.id }) }),
+  [EVENTOS.REEMBOLSADA]: (o, t) => ({ tipo: 'ok', texto: t('notif.reembolsada', { id: o.id }) }),
+  [EVENTOS.PAGO_RECHAZADO]: (_, t) => ({ tipo: 'error', texto: t('notif.rechazado') }),
+  [EVENTOS.LLAMADA_AGENDADA]: (l, t, fecha) => ({ tipo: 'ok', texto: t('notif.llamada', { fecha: fecha(l.fecha), hora: l.hora }) }),
 }
 const ESTILO = {
   ok: { clase: 'border-green-200 text-green-800', Icono: CheckCircle },
@@ -20,17 +22,18 @@ const ESTILO = {
 
 export default function Notificaciones() {
   const [avisos, setAvisos] = useState([])
+  const { t, fecha } = useIdioma()
 
   useEffect(() => {
     const bajas = Object.entries(MENSAJES).map(([evento, crear]) =>
       bus.suscribir(evento, (datos) => {
-        const aviso = { id: Math.random(), ...crear(datos) }
+        const aviso = { id: Math.random(), ...crear(datos, t, fecha) }
         setAvisos((a) => [...a, aviso])
         setTimeout(() => setAvisos((a) => a.filter((x) => x.id !== aviso.id)), 5000)
       })
     )
     return () => bajas.forEach((baja) => baja())
-  }, [])
+  }, [t, fecha])
 
   return (
     <div className="fixed bottom-4 right-4 z-[60] space-y-2 w-[calc(100%-2rem)] max-w-sm" role="status" aria-live="polite">

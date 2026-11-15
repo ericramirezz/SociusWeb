@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { Check, ArrowRight, Star } from 'lucide-react'
 import { seleccion } from '../core'
+import { useIdioma } from '../i18n/IdiomaContext'
 
 export default function ProgramaCard({ programa, seleccionado, onToggle, modo = 'catalogo' }) {
   const navigate = useNavigate()
+  const { t, programa: txt } = useIdioma()
 
   const formatPrecio = (precio, moneda) => {
     return `$${precio.toLocaleString('es-MX')} ${moneda}`
@@ -32,15 +34,15 @@ export default function ProgramaCard({ programa, seleccionado, onToggle, modo = 
         {programa.destacado && (
           <div className="inline-flex items-center gap-1 bg-brand/15 text-brand text-xs font-medium px-2 py-0.5 rounded-full mb-3">
             <Star size={10} fill="currentColor" />
-            Destacado
+            {t('card.destacado')}
           </div>
         )}
         <h3 className="text-navy font-semibold text-sm mb-1">{programa.nombre}</h3>
-        <p className="text-slate-600 text-xs mb-3 line-clamp-2">{programa.descripcion}</p>
+        <p className="text-slate-600 text-xs mb-3 line-clamp-2">{txt(programa, 'descripcion')}</p>
         <p className="text-brand font-bold text-base">{formatPrecio(programa.precio, programa.moneda)}</p>
-        <p className="text-slate-500 text-xs mt-1">{programa.pago}</p>
+        <p className="text-slate-500 text-xs mt-1">{txt(programa, 'pago')}</p>
         <span className="inline-block mt-3 text-[10px] font-semibold uppercase tracking-wider text-brand bg-brand/10 px-2 py-0.5 rounded">
-          {programa.tipo === 'digital' ? 'Producto digital' : 'Servicio'}
+          {t(`tipo.${programa.tipo}`)}
         </span>
       </div>
     )
@@ -53,23 +55,23 @@ export default function ProgramaCard({ programa, seleccionado, onToggle, modo = 
       {programa.destacado && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
           <span className="bg-brand text-white text-xs font-bold tracking-wider uppercase px-3 py-1 rounded-full">
-            Más Popular
+            {t('card.masPopular')}
           </span>
         </div>
       )}
 
       <div className="p-6 flex-1 flex flex-col">
         <h3 className="text-navy font-bold text-lg mb-2">{programa.nombre}</h3>
-        <p className="text-slate-700 text-sm mb-4 leading-relaxed flex-1">{programa.descripcion}</p>
+        <p className="text-slate-700 text-sm mb-4 leading-relaxed flex-1">{txt(programa, 'descripcion')}</p>
 
         <div className="space-y-2 mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 text-xs uppercase tracking-wider">Para quién:</span>
-            <span className="text-slate-700 text-xs">{programa.paraQuien}</span>
+            <span className="text-slate-500 text-xs uppercase tracking-wider">{t('card.paraQuien')}</span>
+            <span className="text-slate-700 text-xs">{txt(programa, 'paraQuien')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 text-xs uppercase tracking-wider">Pago:</span>
-            <span className="text-slate-700 text-xs">{programa.pago}</span>
+            <span className="text-slate-500 text-xs uppercase tracking-wider">{t('card.pago')}</span>
+            <span className="text-slate-700 text-xs">{txt(programa, 'pago')}</span>
           </div>
         </div>
 
@@ -86,7 +88,7 @@ export default function ProgramaCard({ programa, seleccionado, onToggle, modo = 
               : 'border border-brand/40 text-brand hover:bg-brand hover:text-white'
           }`}
         >
-          Cotizar
+          {t('card.cotizar')}
           <ArrowRight size={15} />
         </button>
       </div>

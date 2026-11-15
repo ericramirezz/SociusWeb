@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, ArrowRight, AlertCircle, Trash2 } from 'lucide-react'
 import { programas } from '../data/programas'
-import { pedidos, seleccion, formatoLargo, formatoMoneda } from '../core'
+import { pedidos, seleccion, formatoMoneda } from '../core'
+import { useIdioma } from '../i18n/IdiomaContext'
 import ProgramaCard from '../components/ProgramaCard'
 
 export default function Cotizador() {
   const navigate = useNavigate()
+  const { t, fecha, cobro: detalleCobro } = useIdioma()
   const [seleccionados, setSeleccionados] = useState([])
 
   useEffect(() => {
@@ -35,9 +37,9 @@ export default function Cotizador() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-10">
-          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-2 block">Cotizador</span>
-          <h1 className="text-4xl font-black text-navy">Arma tu paquete Socius</h1>
-          <p className="text-slate-600 mt-2">Selecciona los programas que necesitas. Puedes combinar varios.</p>
+          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-2 block">{t('cotizador.etiqueta')}</span>
+          <h1 className="text-4xl font-black text-navy">{t('cotizador.titulo')}</h1>
+          <p className="text-slate-600 mt-2">{t('cotizador.subtitulo')}</p>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
@@ -64,7 +66,7 @@ export default function Cotizador() {
                 <div className="p-5 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <ShoppingCart size={18} className="text-brand" />
-                    <h2 className="text-navy font-bold">Resumen de cotización</h2>
+                    <h2 className="text-navy font-bold">{t('cotizador.resumen')}</h2>
                   </div>
                 </div>
 
@@ -75,7 +77,7 @@ export default function Cotizador() {
                       <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
                         <ShoppingCart size={20} className="text-slate-400" />
                       </div>
-                      <p className="text-slate-500 text-sm">Selecciona programas para ver el resumen</p>
+                      <p className="text-slate-500 text-sm">{t('cotizador.vacio')}</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -83,8 +85,8 @@ export default function Cotizador() {
                         <div key={p.id} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-slate-50">
                           <div className="flex-1 min-w-0">
                             <p className="text-navy text-sm font-medium truncate">{p.nombre}</p>
-                            <p className="text-brand text-sm font-bold">{formatoMoneda(cobro.hoy)} MXN hoy</p>
-                            <p className="text-slate-500 text-xs">{cobro.detalle}</p>
+                            <p className="text-brand text-sm font-bold">{formatoMoneda(cobro.hoy)} {t('cotizador.hoy')}</p>
+                            <p className="text-slate-500 text-xs">{detalleCobro(p.id)}</p>
                           </div>
                           <button
                             onClick={() => removePrograma(p.id)}
@@ -102,31 +104,31 @@ export default function Cotizador() {
                 {programasSeleccionados.length > 0 && (
                   <div className="border-t border-slate-200 p-5">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-slate-600 text-sm">A pagar hoy</span>
+                      <span className="text-slate-600 text-sm">{t('cotizador.aPagarHoy')}</span>
                       <span className="text-navy font-bold">{formatoMoneda(cotizacion.totalHoy)} MXN</span>
                     </div>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-slate-600 text-sm">Valor total del contrato</span>
+                      <span className="text-slate-600 text-sm">{t('cotizador.valorTotal')}</span>
                       <span className="text-slate-700 text-sm">{formatoMoneda(cotizacion.totalContrato)} MXN</span>
                     </div>
                     <div className="p-3 rounded-lg bg-brand-soft border border-brand/15 mb-3">
-                      <p className="text-brand text-xs font-semibold uppercase tracking-wider mb-1">Fecha de entrega propuesta</p>
+                      <p className="text-brand text-xs font-semibold uppercase tracking-wider mb-1">{t('cotizador.fechaPropuesta')}</p>
                       {cotizacion.requiereAgenda ? (
                         <p className="text-navy text-sm">
-                          Arranque el <strong>{formatoLargo(cotizacion.entregaPropuesta.fechaArranque)}</strong>; primera versión operando el{' '}
-                          <strong>{formatoLargo(cotizacion.entregaPropuesta.fechaEntrega)}</strong>. Puedes proponer otra fecha al pagar.
+                          {t('cotizador.arranqueEl')} <strong>{fecha(cotizacion.entregaPropuesta.fechaArranque)}</strong>; {t('cotizador.primeraVersion')}{' '}
+                          <strong>{fecha(cotizacion.entregaPropuesta.fechaEntrega)}</strong>. {t('cotizador.puedesProponer')}
                         </p>
                       ) : (
-                        <p className="text-navy text-sm">Acceso inmediato al confirmar el pago.</p>
+                        <p className="text-navy text-sm">{t('cotizador.accesoInmediato')}</p>
                       )}
                     </div>
-                    <p className="text-slate-400 text-xs mb-5">*Presupuesto publicitario no incluido</p>
+                    <p className="text-slate-400 text-xs mb-5">{t('cotizador.sinPublicidad')}</p>
 
                     <button
                       onClick={handleIrAPago}
                       className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl text-sm transition-all duration-200"
                     >
-                      Ir a pago
+                      {t('cotizador.irPago')}
                       <ArrowRight size={16} />
                     </button>
                   </div>
@@ -137,7 +139,7 @@ export default function Cotizador() {
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <AlertCircle size={14} className="text-brand mt-0.5 flex-shrink-0" />
                     <p className="text-slate-500 text-xs leading-relaxed">
-                      El presupuesto publicitario para campañas digitales <span className="text-slate-700">no está incluido</span> en ningún programa y se cotiza por separado.
+                      {t('cotizador.notaPublicidad1')} <span className="text-slate-700">{t('cotizador.notaPublicidad2')}</span> {t('cotizador.notaPublicidad3')}
                     </p>
                   </div>
                 </div>

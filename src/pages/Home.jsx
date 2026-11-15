@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronDown, Zap, Target, TrendingUp, Quote, Building2, Users, Clock, Award } from 'lucide-react'
+import { ArrowRight, ChevronDown, Zap, Target, TrendingUp, Building2, Users, Clock, Award } from 'lucide-react'
 import { programas } from '../data/programas'
 import ProgramaCard from '../components/ProgramaCard'
+import PreguntasFrecuentes from '../components/PreguntasFrecuentes'
+import { useIdioma } from '../i18n/IdiomaContext'
 
 function useCountUp(end, duration = 2000, start = false) {
   const [count, setCount] = useState(0)
@@ -35,30 +37,12 @@ function MetricCard({ icon: Icon, value, suffix, label, start }) {
   )
 }
 
-const testimonios = [
-  {
-    texto: 'Socius transformó completamente nuestra operación comercial. En menos de 3 meses ya teníamos un pipeline lleno de prospectos calificados.',
-    autor: 'Ricardo Montoya',
-    cargo: 'Director Comercial, Inmobiliaria RM',
-    rating: 5,
-  },
-  {
-    texto: 'El equipo de Socius no solo instaló la infraestructura — nos acompañó en todo el proceso. Los resultados hablan por sí solos.',
-    autor: 'Valentina Cruz',
-    cargo: 'CEO, Desarrolladora VC',
-    rating: 5,
-  },
-  {
-    texto: 'Probamos varios métodos antes de Socius. Nada se compara. En 4 meses logramos cerrar lo que en años anteriores tardaba más de un año.',
-    autor: 'Alejandro Herrera',
-    cargo: 'Socio, Grupo Herrera Bienes Raíces',
-    rating: 5,
-  },
-]
+const ICONOS_PILARES = [Zap, Target, TrendingUp]
 
 export default function Home() {
   const metricsRef = useRef(null)
   const [metricsVisible, setMetricsVisible] = useState(false)
+  const { t } = useIdioma()
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -77,7 +61,7 @@ export default function Home() {
   return (
     <div className="bg-white">
       {/* HERO */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 overflow-hidden">
+      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-28 pb-24 overflow-hidden">
         {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-white via-brand-soft to-white" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(29,78,216,0.08)_0%,_transparent_60%)]" />
@@ -95,19 +79,18 @@ export default function Home() {
         <div className="relative z-10 max-w-5xl mx-auto">
           <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 text-brand text-xs font-medium tracking-widest uppercase px-4 py-2 rounded-full mb-8">
             <Award size={12} />
-            Real Estate Consulting Premium
+            {t('home.insignia')}
           </div>
 
           <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.05] tracking-tight mb-6">
-            <span className="text-navy">Las ventas inmobiliarias</span>
-            <br />
-            <span className="text-navy">de un año,</span>
-            <br />
-            <span className="text-brand">en solo 4 meses.</span>
+            {[t('home.titulo1'), t('home.titulo2')].filter(Boolean).map((linea) => (
+              <span key={linea} className="block text-navy">{linea}</span>
+            ))}
+            <span className="block text-brand">{t('home.titulo3')}</span>
           </h1>
 
           <p className="text-slate-700 text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            Instalamos infraestructura comercial de alto desempeño para desarrolladores y brokers inmobiliarios. No somos una agencia — somos el sistema que acelera tus cierres.
+            {t('home.subtitulo')}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -115,20 +98,20 @@ export default function Home() {
               to="/agenda"
               className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-8 py-4 rounded-xl text-base transition-all duration-200 shadow-lg shadow-brand/20 hover:shadow-brand/30 hover:scale-105"
             >
-              Agendar llamada estratégica
+              {t('comun.agendarLlamadaEstrategica')}
               <ArrowRight size={18} />
             </Link>
             <Link
               to="/catalogo"
               className="flex items-center gap-2 border border-slate-300 hover:border-slate-400 text-navy font-semibold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:bg-slate-100"
             >
-              Ver programas
+              {t('home.verProgramas')}
             </Link>
           </div>
 
           {/* Trust logos */}
           <div className="mt-16 flex flex-col items-center gap-4">
-            <p className="text-slate-400 text-xs uppercase tracking-widest">Clientes &amp; Partners</p>
+            <p className="text-slate-400 text-xs uppercase tracking-widest">{t('home.clientes')}</p>
             <div className="flex items-center gap-8">
               {['JLL', 'Coldwell Banker', 'FUNO'].map((brand) => (
                 <span key={brand} className="text-slate-500 text-sm font-semibold tracking-wider hover:text-slate-600 transition-colors">
@@ -140,7 +123,7 @@ export default function Home() {
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce text-slate-400">
+        <div className="hidden sm:block absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce text-slate-400">
           <ChevronDown size={24} />
         </div>
       </section>
@@ -151,45 +134,31 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
               <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-4 block">
-                ¿Qué es Socius?
+                {t('home.queEs')}
               </span>
               <h2 className="text-4xl sm:text-5xl font-black text-navy leading-tight mb-6">
-                No somos una agencia.<br />
-                <span className="text-brand">Instalamos infraestructura.</span>
+                {t('home.queEsTitulo1')}<br />
+                <span className="text-brand">{t('home.queEsTitulo2')}</span>
               </h2>
               <p className="text-slate-700 text-lg leading-relaxed mb-6">
-                Socius diseña, implementa y opera el sistema comercial completo de tu desarrollo inmobiliario. Desde la atracción de prospectos hasta el cierre del contrato — con métricas, procesos y tecnología.
+                {t('home.queEsP1')}
               </p>
               <p className="text-slate-600 text-base leading-relaxed">
-                Trabajamos con desarrolladores, brokers y fondos de inversión que quieren resultados medibles, no promesas vacías.
+                {t('home.queEsP2')}
               </p>
               <Link
                 to="/agenda"
                 className="inline-flex items-center gap-2 mt-8 text-brand font-semibold hover:gap-3 transition-all duration-200"
               >
-                Hablar con un estratega
+                {t('comun.hablarEstratega')}
                 <ArrowRight size={16} />
               </Link>
             </div>
 
             <div className="space-y-4">
-              {[
-                {
-                  icon: Zap,
-                  titulo: 'Atraer',
-                  desc: 'Generamos demanda calificada con campañas de alto rendimiento, landing pages optimizadas y estrategia de contenido.',
-                },
-                {
-                  icon: Target,
-                  titulo: 'Calificar',
-                  desc: 'Filtramos, calificamos y nutrimos cada prospecto con CRM avanzado y agentes de IA que responden 24/7.',
-                },
-                {
-                  icon: TrendingUp,
-                  titulo: 'Cerrar',
-                  desc: 'Entrenamos y acompañamos al equipo comercial para maximizar la tasa de cierre con técnicas probadas.',
-                },
-              ].map(({ icon: Icon, titulo, desc }) => (
+              {t('home.pilares').map(({ titulo, desc }, i) => {
+                const Icon = ICONOS_PILARES[i]
+                return (
                 <div
                   key={titulo}
                   className="flex items-start gap-5 p-5 rounded-xl border border-slate-200 bg-slate-50 hover:border-brand/20 hover:bg-brand/3 transition-all duration-300"
@@ -202,7 +171,8 @@ export default function Home() {
                     <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -212,14 +182,14 @@ export default function Home() {
       <section ref={metricsRef} className="py-20 px-4 border-y border-slate-200 bg-slate-50">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">Resultados</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy">Números que respaldan el sistema</h2>
+            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.resultados')}</span>
+            <h2 className="text-3xl sm:text-4xl font-black text-navy">{t('home.resultadosTitulo')}</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-x-0 md:divide-x divide-slate-200">
-            <MetricCard icon={Building2} value={50} suffix="+" label="Desarrollos atendidos" start={metricsVisible} />
-            <MetricCard icon={Users} value={1200} suffix="+" label="Citas generadas" start={metricsVisible} />
-            <MetricCard icon={Clock} value={4} suffix=" meses" label="Promedio al cierre" start={metricsVisible} />
-            <MetricCard icon={Award} value={3} suffix="" label="Alianzas estratégicas" start={metricsVisible} />
+            <MetricCard icon={Building2} value={50} suffix="+" label={t('home.metricas.desarrollos')} start={metricsVisible} />
+            <MetricCard icon={Users} value={1200} suffix="+" label={t('home.metricas.citas')} start={metricsVisible} />
+            <MetricCard icon={Clock} value={4} suffix={t('home.metricas.meses')} label={t('home.metricas.promedio')} start={metricsVisible} />
+            <MetricCard icon={Award} value={3} suffix="" label={t('home.metricas.alianzas')} start={metricsVisible} />
           </div>
         </div>
       </section>
@@ -228,9 +198,9 @@ export default function Home() {
       <section className="py-24 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-14">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">Programas</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy mb-4">Elige cómo quieres trabajar con Socius</h2>
-            <p className="text-slate-600 max-w-xl mx-auto">Desde infraestructura completa hasta formación de equipos. Tenemos el programa correcto para tu etapa.</p>
+            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.programas')}</span>
+            <h2 className="text-3xl sm:text-4xl font-black text-navy mb-4">{t('home.programasTitulo')}</h2>
+            <p className="text-slate-600 max-w-xl mx-auto">{t('home.programasSub')}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -244,40 +214,9 @@ export default function Home() {
               to="/catalogo"
               className="inline-flex items-center gap-2 border border-slate-200 hover:border-brand/40 text-slate-700 hover:text-brand text-sm font-medium px-6 py-3 rounded-lg transition-all duration-200"
             >
-              Ver comparativa completa
+              {t('home.verComparativa')}
               <ArrowRight size={15} />
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIOS */}
-      <section className="py-24 px-4 border-t border-slate-200">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">Testimonios</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy">Lo que dicen nuestros clientes</h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonios.map((t, i) => (
-              <div
-                key={i}
-                className="p-6 rounded-2xl border border-slate-200 bg-slate-50 hover:border-brand/20 transition-all duration-300 card-hover"
-              >
-                <Quote size={24} className="text-brand/40 mb-4" />
-                <p className="text-slate-700 text-sm leading-relaxed mb-6">"{t.texto}"</p>
-                <div className="flex items-center gap-1 mb-4">
-                  {Array.from({ length: t.rating }).map((_, j) => (
-                    <span key={j} className="text-brand text-xs">★</span>
-                  ))}
-                </div>
-                <div>
-                  <p className="text-navy font-semibold text-sm">{t.autor}</p>
-                  <p className="text-slate-500 text-xs mt-0.5">{t.cargo}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -289,31 +228,33 @@ export default function Home() {
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(29,78,216,0.08)_0%,_transparent_70%)]" />
             <div className="relative z-10">
               <h2 className="text-4xl sm:text-5xl font-black text-navy mb-4 leading-tight">
-                ¿Listo para escalar tu<br />
-                <span className="text-brand">proyecto inmobiliario?</span>
+                {t('home.ctaTitulo1')}<br />
+                <span className="text-brand">{t('home.ctaTitulo2')}</span>
               </h2>
               <p className="text-slate-700 text-lg mb-10 max-w-xl mx-auto">
-                Agenda una llamada estratégica gratuita. En 30 minutos te mostramos cómo Socius puede transformar tu operación comercial.
+                {t('home.ctaTexto')}
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   to="/agenda"
                   className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:scale-105"
                 >
-                  Agendar llamada estratégica
+                  {t('comun.agendarLlamadaEstrategica')}
                   <ArrowRight size={18} />
                 </Link>
                 <Link
                   to="/cotizador"
                   className="text-brand font-semibold text-base hover:text-brand-dark transition-colors"
                 >
-                  O ir al cotizador →
+                  {t('home.irCotizador')}
                 </Link>
               </div>
             </div>
           </div>
         </div>
       </section>
+      {/* PREGUNTAS FRECUENTES: siempre al final de la portada */}
+      <PreguntasFrecuentes />
     </div>
   )
 }

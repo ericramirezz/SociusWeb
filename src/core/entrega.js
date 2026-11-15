@@ -43,14 +43,18 @@ export function resolverFechaCliente(fechaISO, hoy, config, ocupacion = {}) {
   const minimo = deISO(aISO(sumarDiasHabiles(hoy, config.diasHabilesMinimosArranque))) // sin hora
   const pedida = deISO(fechaISO)
   if (pedida >= minimo && hayDisponibilidad(pedida, config, ocupacion)) {
-    return { confirmada: true, fecha: fechaISO, motivo: null }
+    return { confirmada: true, fecha: fechaISO, motivo: null, codigo: null }
   }
   const base = pedida < minimo ? minimo : pedida
   const sugerida = aISO(primerDiaDisponible(base, config, ocupacion))
-  const motivo = pedida < minimo
-    ? `Se necesitan al menos ${config.diasHabilesMinimosArranque} días hábiles de anticipación`
-    : !esHabil(pedida) ? 'Los arranques son de lunes a viernes' : 'Ese día ya no tiene lugares'
-  return { confirmada: false, fecha: sugerida, motivo }
+  // `codigo` permite a la interfaz mostrar el motivo en el idioma elegido.
+  const codigo = pedida < minimo ? 'anticipacion' : !esHabil(pedida) ? 'finDeSemana' : 'sinLugar'
+  const motivo = {
+    anticipacion: `Se necesitan al menos ${config.diasHabilesMinimosArranque} días hábiles de anticipación`,
+    finDeSemana: 'Los arranques son de lunes a viernes',
+    sinLugar: 'Ese día ya no tiene lugares',
+  }[codigo]
+  return { confirmada: false, fecha: sugerida, motivo, codigo }
 }
 
 // --- 2. Estrategias de cobro ---------------------------------------------

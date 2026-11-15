@@ -2,25 +2,27 @@ import { useState } from 'react'
 import { Calendar, Clock, CheckCircle, ArrowRight, Phone, Mail, MessageSquare } from 'lucide-react'
 
 import { agenda, formatoLargo } from '../core'
+import { useIdioma } from '../i18n/IdiomaContext'
 
-const diaSemana = (iso) => formatoLargo(iso).split(',')[0]
+const diaSemana = (iso, locale) => formatoLargo(iso, locale).split(',')[0]
 
 export default function Agenda() {
+  const { t, fecha, locale } = useIdioma()
   const [form, setForm] = useState({ nombre: '', empresa: '', email: '', telefono: '', mensaje: '' })
   const [errors, setErrors] = useState({})
   const [selectedSlot, setSelectedSlot] = useState({ fecha: '', hora: '' })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   // Próximos 5 días hábiles, sin los horarios que ya están tomados.
-  const [slots] = useState(() => agenda.horarios().map((s) => ({ ...s, dia: diaSemana(s.fecha) })))
+  const [slots] = useState(() => agenda.horarios())
 
   const validate = () => {
     const e = {}
-    if (!form.nombre.trim()) e.nombre = 'Campo requerido'
-    if (!form.empresa.trim()) e.empresa = 'Campo requerido'
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = 'Email válido requerido'
-    if (!form.telefono.trim()) e.telefono = 'Campo requerido'
-    if (!selectedSlot.fecha || !selectedSlot.hora) e.slot = 'Selecciona un horario'
+    if (!form.nombre.trim()) e.nombre = t('agenda.requerido')
+    if (!form.empresa.trim()) e.empresa = t('agenda.requerido')
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = t('comun.emailValido')
+    if (!form.telefono.trim()) e.telefono = t('agenda.requerido')
+    if (!selectedSlot.fecha || !selectedSlot.hora) e.slot = t('agenda.seleccionaHorario')
     return e
   }
 
@@ -43,8 +45,8 @@ export default function Agenda() {
       try {
         agenda.agendar({ cliente: form, fecha: selectedSlot.fecha, hora: selectedSlot.hora })
         setSubmitted(true)
-      } catch (err) {
-        setErrors({ slot: err.message })
+      } catch {
+        setErrors({ slot: t('agenda.noDisponible') })
       }
     }, 800)
   }
@@ -53,7 +55,7 @@ export default function Agenda() {
     `w-full bg-white border ${errors[field] ? 'border-red-400' : 'border-slate-300'} rounded-lg px-4 py-3 text-navy text-sm placeholder-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-all duration-200`
 
   if (submitted) {
-    const fechaFormateada = formatoLargo(selectedSlot.fecha)
+    const fechaFormateada = fecha(selectedSlot.fecha)
 
     return (
       <div className="min-h-screen bg-white pt-24 pb-20 px-4 flex items-center">
@@ -61,9 +63,9 @@ export default function Agenda() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 border border-green-500/20 mb-6">
             <CheckCircle size={40} className="text-green-700" />
           </div>
-          <h1 className="text-4xl font-black text-navy mb-3">¡Llamada agendada!</h1>
+          <h1 className="text-4xl font-black text-navy mb-3">{t('agenda.agendada')}</h1>
           <p className="text-slate-600 text-lg mb-8">
-            Hemos recibido tu solicitud. Te confirmaremos por email.
+            {t('agenda.recibida')}
           </p>
 
           <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm text-left space-y-4 mb-8">
@@ -72,7 +74,7 @@ export default function Agenda() {
                 <Calendar size={16} className="text-brand" />
               </div>
               <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider">Fecha</p>
+                <p className="text-slate-500 text-xs uppercase tracking-wider">{t('agenda.fecha')}</p>
                 <p className="text-navy font-semibold text-sm">{fechaFormateada}</p>
               </div>
             </div>
@@ -81,8 +83,8 @@ export default function Agenda() {
                 <Clock size={16} className="text-brand" />
               </div>
               <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider">Hora</p>
-                <p className="text-navy font-semibold text-sm">{selectedSlot.hora} hrs (hora CDMX)</p>
+                <p className="text-slate-500 text-xs uppercase tracking-wider">{t('agenda.hora')}</p>
+                <p className="text-navy font-semibold text-sm">{t('agenda.horaCdmx', { hora: selectedSlot.hora })}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -90,14 +92,14 @@ export default function Agenda() {
                 <Phone size={16} className="text-brand" />
               </div>
               <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider">Contacto</p>
+                <p className="text-slate-500 text-xs uppercase tracking-wider">{t('agenda.contacto')}</p>
                 <p className="text-navy font-semibold text-sm">{form.nombre} · {form.empresa}</p>
               </div>
             </div>
           </div>
 
           <p className="text-slate-500 text-sm">
-            Un estratega de Socius te contactará al {form.email} para confirmar y enviar el enlace de la videollamada.
+            {t('agenda.teContactara', { email: form.email })}
           </p>
         </div>
       </div>
@@ -109,10 +111,10 @@ export default function Agenda() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-14">
-          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">Agenda</span>
-          <h1 className="text-4xl sm:text-5xl font-black text-navy mb-4">Agendar llamada estratégica</h1>
+          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('agenda.etiqueta')}</span>
+          <h1 className="text-4xl sm:text-5xl font-black text-navy mb-4">{t('comun.agendarLlamadaEstrategica')}</h1>
           <p className="text-slate-600 max-w-xl mx-auto">
-            30 minutos, sin costo. Te mostramos exactamente cómo Socius puede escalar tu desarrollo inmobiliario.
+            {t('agenda.subtitulo')}
           </p>
         </div>
 
@@ -122,46 +124,46 @@ export default function Agenda() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Contact */}
               <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <h2 className="text-navy font-bold text-lg mb-5">Tu información</h2>
+                <h2 className="text-navy font-bold text-lg mb-5">{t('agenda.tuInfo')}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">Nombre completo</label>
+                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.nombreCompleto')}</label>
                     <input
                       type="text"
                       name="nombre"
                       value={form.nombre}
                       onChange={handleChange}
-                      placeholder="Tu nombre"
+                      placeholder={t('comun.tuNombre')}
                       className={inputClass('nombre')}
                     />
                     {errors.nombre && <p className="text-red-600 text-xs mt-1">{errors.nombre}</p>}
                   </div>
                   <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">Empresa / Proyecto</label>
+                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.empresa')}</label>
                     <input
                       type="text"
                       name="empresa"
                       value={form.empresa}
                       onChange={handleChange}
-                      placeholder="Tu empresa"
+                      placeholder={t('agenda.phEmpresa')}
                       className={inputClass('empresa')}
                     />
                     {errors.empresa && <p className="text-red-600 text-xs mt-1">{errors.empresa}</p>}
                   </div>
                   <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">Email</label>
+                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.email')}</label>
                     <input
                       type="email"
                       name="email"
                       value={form.email}
                       onChange={handleChange}
-                      placeholder="tu@empresa.com"
+                      placeholder={t('comun.phEmail')}
                       className={inputClass('email')}
                     />
                     {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
                   </div>
                   <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">Teléfono</label>
+                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.telefono')}</label>
                     <input
                       type="tel"
                       name="telefono"
@@ -174,13 +176,13 @@ export default function Agenda() {
                   </div>
                   <div className="sm:col-span-2">
                     <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">
-                      Cuéntanos de tu proyecto (opcional)
+                      {t('agenda.proyecto')}
                     </label>
                     <textarea
                       name="mensaje"
                       value={form.mensaje}
                       onChange={handleChange}
-                      placeholder="¿En qué etapa está tu desarrollo? ¿Cuál es tu principal reto comercial?"
+                      placeholder={t('agenda.phProyecto')}
                       rows={3}
                       className={`${inputClass('mensaje')} resize-none`}
                     />
@@ -192,7 +194,7 @@ export default function Agenda() {
               <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <h2 className="text-navy font-bold text-lg mb-5 flex items-center gap-2">
                   <Calendar size={18} className="text-brand" />
-                  Selecciona fecha y hora
+                  {t('agenda.seleccionaFecha')}
                 </h2>
                 {errors.slot && (
                   <p className="text-red-600 text-xs mb-3">{errors.slot}</p>
@@ -201,7 +203,7 @@ export default function Agenda() {
                   {slots.map((slot) => (
                     <div key={slot.fecha}>
                       <p className="text-slate-600 text-xs uppercase tracking-wider mb-2">
-                        {formatoLargo(slot.fecha)}
+                        {fecha(slot.fecha)}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {slot.horas.map((hora) => {
@@ -233,7 +235,7 @@ export default function Agenda() {
                   <div className="mt-5 p-3 rounded-lg bg-brand/5 border border-brand/15 flex items-center gap-2">
                     <CheckCircle size={15} className="text-brand" />
                     <p className="text-brand text-sm font-medium">
-                      Seleccionado: {slots.find((s) => s.fecha === selectedSlot.fecha)?.dia} a las {selectedSlot.hora} hrs
+                      {t('agenda.seleccionado', { dia: diaSemana(selectedSlot.fecha, locale), hora: selectedSlot.hora })}
                     </p>
                   </div>
                 )}
@@ -247,11 +249,11 @@ export default function Agenda() {
                 {loading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    Confirmando...
+                    {t('agenda.confirmando')}
                   </>
                 ) : (
                   <>
-                    Confirmar llamada estratégica
+                    {t('agenda.confirmar')}
                     <ArrowRight size={16} />
                   </>
                 )}
@@ -263,15 +265,9 @@ export default function Agenda() {
           <div className="lg:w-72">
             <div className="sticky top-24 space-y-4">
               <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <h3 className="text-navy font-bold mb-4">¿Qué esperar?</h3>
+                <h3 className="text-navy font-bold mb-4">{t('agenda.queEsperar')}</h3>
                 <ul className="space-y-3">
-                  {[
-                    '30 minutos de sesión estratégica',
-                    'Diagnóstico de tu etapa comercial',
-                    'Recomendación de programa',
-                    'Propuesta personalizada',
-                    'Sin compromiso de compra',
-                  ].map((item) => (
+                  {t('agenda.esperar').map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <CheckCircle size={14} className="text-brand mt-0.5 flex-shrink-0" />
                       <span className="text-slate-700 text-sm">{item}</span>
@@ -281,7 +277,7 @@ export default function Agenda() {
               </div>
 
               <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50">
-                <h3 className="text-slate-700 font-semibold text-sm mb-3">También puedes contactarnos</h3>
+                <h3 className="text-slate-700 font-semibold text-sm mb-3">{t('agenda.tambien')}</h3>
                 <div className="space-y-2">
                   <a href="mailto:hola@socius.mx" className="flex items-center gap-2 text-slate-600 hover:text-brand text-sm transition-colors">
                     <Mail size={14} />

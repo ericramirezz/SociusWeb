@@ -1,4 +1,5 @@
-import { ESTADOS, ETIQUETAS } from '../core'
+import { ESTADOS } from '../core'
+import { useIdioma } from '../i18n/IdiomaContext'
 
 const ESTILOS = {
   [ESTADOS.COTIZADA]: 'bg-slate-100 text-slate-700 border-slate-300',
@@ -11,10 +12,11 @@ const ESTILOS = {
 }
 
 export default function EstadoBadge({ estado }) {
+  const { t } = useIdioma()
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full border ${ESTILOS[estado] ?? ESTILOS[ESTADOS.COTIZADA]}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {ETIQUETAS[estado] ?? estado}
+      {t(`estados.${estado}`)}
     </span>
   )
 }

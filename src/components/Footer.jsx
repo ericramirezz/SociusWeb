@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom'
 import { Instagram, Linkedin, Twitter, Mail, Phone } from 'lucide-react'
+import { useIdioma } from '../i18n/IdiomaContext'
 
 export default function Footer() {
+  const { t } = useIdioma()
   return (
     <footer className="bg-white border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -10,7 +12,7 @@ export default function Footer() {
           <div className="md:col-span-1">
             <span className="text-3xl font-black tracking-widest text-brand">SOCIUS</span>
             <p className="mt-3 text-slate-600 text-sm leading-relaxed">
-              Real Estate Consulting. Infraestructura comercial para desarrollos inmobiliarios de alto desempeño.
+              {t('footer.descripcion')}
             </p>
             <div className="flex items-center gap-3 mt-5">
               <a
@@ -42,13 +44,14 @@ export default function Footer() {
 
           {/* Nav */}
           <div>
-            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">Navegación</h4>
+            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.navegacion')}</h4>
             <ul className="space-y-2">
               {[
-                { label: 'Inicio', href: '/' },
-                { label: 'Programas', href: '/catalogo' },
-                { label: 'Cotizador', href: '/cotizador' },
-                { label: 'Mis Pedidos', href: '/pedidos' },
+                { label: t('nav.inicio'), href: '/' },
+                { label: t('nav.programas'), href: '/catalogo' },
+                { label: t('nav.testimonios'), href: '/testimonios' },
+                { label: t('nav.cotizador'), href: '/cotizador' },
+                { label: t('nav.pedidos'), href: '/pedidos' },
               ].map((l) => (
                 <li key={l.href}>
                   <Link to={l.href} className="text-sm text-slate-700 hover:text-brand transition-colors duration-200">
@@ -61,7 +64,7 @@ export default function Footer() {
 
           {/* Programs */}
           <div>
-            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">Programas</h4>
+            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.programas')}</h4>
             <ul className="space-y-2">
               {['Nexus Growth', 'Nexus Partner', 'Socius Core', 'Nexus IA', 'AVI'].map((p) => (
                 <li key={p}>
@@ -75,7 +78,7 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">Contacto</h4>
+            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.contacto')}</h4>
             <ul className="space-y-3">
               <li>
                 <a href="mailto:hola@socius.mx" className="flex items-center gap-2 text-sm text-slate-700 hover:text-brand transition-colors duration-200">
@@ -95,7 +98,7 @@ export default function Footer() {
                 to="/agenda"
                 className="inline-block bg-brand hover:bg-brand-dark text-white text-xs font-bold tracking-wider uppercase px-5 py-2.5 rounded-md transition-all duration-200"
               >
-                Agendar llamada
+                {t('nav.cta')}
               </Link>
             </div>
           </div>
@@ -103,7 +106,7 @@ export default function Footer() {
 
         <div className="mt-12 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-400">
-            © {new Date().getFullYear()} Socius Real Estate Consulting. Todos los derechos reservados.
+            © {new Date().getFullYear()} Socius Real Estate Consulting. {t('footer.derechos')}
           </p>
           <p className="text-xs text-slate-400">
             JLL · Coldwell Banker · FUNO

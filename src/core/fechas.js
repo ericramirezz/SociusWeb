@@ -32,7 +32,7 @@ export function sumarMeses(fecha, meses) {
   return r
 }
 
-export const formatoLargo = (iso) =>
-  deISO(iso).toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+export const formatoLargo = (iso, locale = 'es-MX') =>
+  deISO(iso).toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
 export const formatoMoneda = (n) => `$${Number(n).toLocaleString('es-MX')}`

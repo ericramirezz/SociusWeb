@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 
-export default function Modal({ isOpen, onClose, title, children }) {
+const anchos = { md: 'max-w-md', lg: 'max-w-3xl' }
+
+export default function Modal({ isOpen, onClose, title, children, size = 'md' }) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -25,7 +27,7 @@ export default function Modal({ isOpen, onClose, title, children }) {
 
       {/* Content */}
       <div
-        className="relative z-10 w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/70 animate-fade-in"
+        className={`relative z-10 w-full ${anchos[size] || anchos.md} bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-200/70 animate-fade-in`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-200">

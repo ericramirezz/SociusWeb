@@ -7,7 +7,7 @@ Aplicación web para Socius Real Estate Consulting: catálogo con precios, cotiz
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 27 casos de prueba (Vitest)
+npm test           # 30 casos de prueba (Vitest)
 npm run build      # versión de producción en dist/
 ```
 
@@ -38,11 +38,28 @@ src/
       decoradores.js        Decorator: bitácora, idempotencia, reintento
       fabricaPasarelas.js   Factory Method con registro
     __tests__/          Pruebas unitarias (CP-01 a CP-22)
-  __tests__/            Pruebas de interfaz (CP-23 a CP-25)
-  pages/                Una pantalla por ruta
-  components/           Navbar, Footer, Modal, ProgramaCard, EstadoBadge, Notificaciones
+  __tests__/            Pruebas de interfaz (CP-23 a CP-28)
+  i18n/                 Idiomas: IdiomaContext (useIdioma, t), es.js, en.js
+  pages/                Una pantalla por ruta (incluye /testimonios)
+  components/           Navbar, SelectorIdioma, Footer, Modal, ProgramaCard, TestimonioCard,
+                        PreguntasFrecuentes, EstadoBadge, Notificaciones
   data/programas.js     Catálogo
+  data/testimonios.js   Testimonios (texto, foto, video y traducción)
+public/testimonios/     Fotos y videos de los testimonios
 ```
+
+## Idiomas
+
+Español (Latinoamérica) e English (US), con el ícono de mundo del menú. La elección se guarda en el navegador.
+
+- Todo texto visible sale de `src/i18n/es.js` / `en.js` con `t('seccion.clave')`; no se escriben textos fijos en los componentes.
+- El núcleo (`core/`) no traduce: entrega códigos (estado, forma de pago, motivo de fecha) y la interfaz los convierte en texto.
+- Agregar un idioma: crear su diccionario y registrarlo en `IDIOMAS` de `IdiomaContext.jsx`. Lo que falte se muestra en español.
+- La moneda no cambia con el idioma; de eso se encargará la pasarela de pago.
+
+## Testimonios con foto o video
+
+Se editan en `src/data/testimonios.js` (instrucciones en el comentario del archivo). Los archivos van en `public/testimonios/` y se escriben como `'/testimonios/nombre.jpg'`; el video también puede ser un enlace de YouTube o Vimeo.
 
 Regla: las pantallas solo hablan con `core/index.js` (`pedidos`, `agenda`, `bus`, `seleccion`). Nada de `localStorage` ni reglas de negocio dentro de un componente.
 

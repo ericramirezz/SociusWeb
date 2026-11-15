@@ -9,27 +9,32 @@ import Checkout from './pages/Checkout'
 import Confirmacion from './pages/Confirmacion'
 import Pedidos from './pages/Pedidos'
 import Agenda from './pages/Agenda'
+import Testimonios from './pages/Testimonios'
+import { IdiomaProvider } from './i18n/IdiomaContext'
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-white flex flex-col">
-        <Navbar />
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/catalogo" element={<Catalogo />} />
-            <Route path="/cotizador" element={<Cotizador />} />
-            <Route path="/checkout" element={<Checkout />} />
-            <Route path="/confirmacion" element={<Confirmacion />} />
-            <Route path="/pedidos" element={<Pedidos />} />
-            <Route path="/agenda" element={<Agenda />} />
-          </Routes>
-        </main>
-        <Footer />
-        <Notificaciones />
-      </div>
-    </BrowserRouter>
+    <IdiomaProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-white flex flex-col">
+          <Navbar />
+          <main className="flex-1">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/catalogo" element={<Catalogo />} />
+              <Route path="/testimonios" element={<Testimonios />} />
+              <Route path="/cotizador" element={<Cotizador />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/confirmacion" element={<Confirmacion />} />
+              <Route path="/pedidos" element={<Pedidos />} />
+              <Route path="/agenda" element={<Agenda />} />
+            </Routes>
+          </main>
+          <Footer />
+          <Notificaciones />
+        </div>
+      </BrowserRouter>
+    </IdiomaProvider>
   )
 }
 
