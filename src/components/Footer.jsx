@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Instagram, Linkedin, Twitter, Mail, Phone } from 'lucide-react'
+import { Instagram, Linkedin, Twitter, Mail } from 'lucide-react'
 import { useIdioma } from '../i18n/IdiomaContext'
 
 export default function Footer() {
@@ -14,6 +14,7 @@ export default function Footer() {
             <p className="mt-3 text-slate-600 text-sm leading-relaxed">
               {t('footer.descripcion')}
             </p>
+            <p className="mt-2 text-brand text-sm font-semibold">{t('footer.lema')}</p>
             <div className="flex items-center gap-3 mt-5">
               <a
                 href="https://instagram.com"
@@ -81,16 +82,11 @@ export default function Footer() {
             <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.contacto')}</h4>
             <ul className="space-y-3">
               <li>
-                <a href="mailto:hola@socius.mx" className="flex items-center gap-2 text-sm text-slate-700 hover:text-brand transition-colors duration-200">
+                <a href="mailto:admin@sociusrealestate.com" className="flex items-center gap-2 text-sm text-slate-700 hover:text-brand transition-colors duration-200">
                   <Mail size={14} />
-                  hola@socius.mx
+                  admin@sociusrealestate.com
                 </a>
-              </li>
-              <li>
-                <a href="tel:+525512345678" className="flex items-center gap-2 text-sm text-slate-700 hover:text-brand transition-colors duration-200">
-                  <Phone size={14} />
-                  +52 55 1234 5678
-                </a>
+
               </li>
             </ul>
             <div className="mt-6">
@@ -109,7 +105,7 @@ export default function Footer() {
             © {new Date().getFullYear()} Socius Real Estate Consulting. {t('footer.derechos')}
           </p>
           <p className="text-xs text-slate-400">
-            JLL · Coldwell Banker · FUNO
+            {t('footer.hechoEn')}
           </p>
         </div>
       </div>

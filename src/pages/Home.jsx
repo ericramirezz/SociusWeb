@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronDown, Zap, Target, TrendingUp, Building2, Users, Clock, Award } from 'lucide-react'
+import { ArrowRight, ChevronDown, Zap, Target, TrendingUp, Building2, Clock, Award, BadgeDollarSign, Gauge, CheckCircle2, GraduationCap } from 'lucide-react'
 import { programas } from '../data/programas'
 import ProgramaCard from '../components/ProgramaCard'
 import PreguntasFrecuentes from '../components/PreguntasFrecuentes'
@@ -22,22 +22,25 @@ function useCountUp(end, duration = 2000, start = false) {
   return count
 }
 
-function MetricCard({ icon: Icon, value, suffix, label, start }) {
+function MetricCard({ icon: Icon, value, prefix = '', suffix, label, start }) {
   const count = useCountUp(value, 2000, start)
+  const { locale } = useIdioma()
   return (
     <div className="text-center p-6">
       <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-brand/10 flex items-center justify-center">
         <Icon size={22} className="text-brand" />
       </div>
       <div className="text-4xl font-black text-navy mb-1">
-        {count}{suffix}
+        {prefix}{count.toLocaleString(locale)}{suffix}
       </div>
-      <div className="text-slate-600 text-sm">{label}</div>
+      <div className="text-slate-600 text-sm max-w-[14rem] mx-auto">{label}</div>
     </div>
   )
 }
 
 const ICONOS_PILARES = [Zap, Target, TrendingUp]
+// Desarrollos y brokers que han trabajado con Socius (de sociusrealestate.com).
+const CLIENTES = ['Terraviva', 'Vivenza', 'Global Inmuebles', 'We Santa Fe', 'Sahai', 'Riga Bosques', 'Coldwell Banker', 'Urbano Town']
 
 export default function Home() {
   const metricsRef = useRef(null)
@@ -112,8 +115,8 @@ export default function Home() {
           {/* Trust logos */}
           <div className="mt-16 flex flex-col items-center gap-4">
             <p className="text-slate-400 text-xs uppercase tracking-widest">{t('home.clientes')}</p>
-            <div className="flex items-center gap-8">
-              {['JLL', 'Coldwell Banker', 'FUNO'].map((brand) => (
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 max-w-2xl">
+              {CLIENTES.map((brand) => (
                 <span key={brand} className="text-slate-500 text-sm font-semibold tracking-wider hover:text-slate-600 transition-colors">
                   {brand}
                 </span>
@@ -128,7 +131,33 @@ export default function Home() {
         </div>
       </section>
 
-      {/* QUÉ ES SOCIUS */}
+      {/* DIAGNÓSTICO: el problema que resuelve Socius */}
+      <section className="py-24 px-4 bg-slate-50 border-y border-slate-200">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.diagnostico.etiqueta')}</span>
+            <h2 className="text-4xl sm:text-5xl font-black text-navy leading-tight">
+              {t('home.diagnostico.titulo1')}<br />
+              <span className="text-brand">{t('home.diagnostico.titulo2')}</span>
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {t('home.diagnostico.problemas').map(({ titulo, desc }, i) => (
+              <div key={titulo} className="p-6 rounded-2xl bg-white border border-slate-200">
+                <span className="text-brand/30 text-4xl font-black">{String(i + 1).padStart(2, '0')}</span>
+                <h3 className="text-navy font-bold text-lg mt-2 mb-2">{titulo}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="text-center mt-12 max-w-2xl mx-auto">
+            <p className="text-navy text-xl font-bold mb-2">{t('home.diagnostico.cierre1')}</p>
+            <p className="text-slate-700 text-lg">{t('home.diagnostico.cierre2')}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* CÓMO FUNCIONA LA MÁQUINA */}
       <section className="py-24 px-4">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-2 gap-16 items-center">
@@ -143,7 +172,7 @@ export default function Home() {
               <p className="text-slate-700 text-lg leading-relaxed mb-6">
                 {t('home.queEsP1')}
               </p>
-              <p className="text-slate-600 text-base leading-relaxed">
+              <p className="text-navy text-base font-semibold">
                 {t('home.queEsP2')}
               </p>
               <Link
@@ -156,7 +185,7 @@ export default function Home() {
             </div>
 
             <div className="space-y-4">
-              {t('home.pilares').map(({ titulo, desc }, i) => {
+              {t('home.pilares').map(({ titulo, desc, metrica }, i) => {
                 const Icon = ICONOS_PILARES[i]
                 return (
                 <div
@@ -169,6 +198,7 @@ export default function Home() {
                   <div>
                     <h3 className="text-navy font-bold text-base mb-1">{titulo}</h3>
                     <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
+                    <p className="mt-2 text-brand text-xs font-semibold">{metrica}</p>
                   </div>
                 </div>
                 )
@@ -186,10 +216,77 @@ export default function Home() {
             <h2 className="text-3xl sm:text-4xl font-black text-navy">{t('home.resultadosTitulo')}</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-x-0 md:divide-x divide-slate-200">
-            <MetricCard icon={Building2} value={50} suffix="+" label={t('home.metricas.desarrollos')} start={metricsVisible} />
-            <MetricCard icon={Users} value={1200} suffix="+" label={t('home.metricas.citas')} start={metricsVisible} />
+            <MetricCard icon={Building2} value={250} prefix="+" suffix="" label={t('home.metricas.negocios')} start={metricsVisible} />
+            <MetricCard icon={BadgeDollarSign} value={2500} prefix="$" suffix={t('home.metricas.mdp')} label={t('home.metricas.ventas')} start={metricsVisible} />
             <MetricCard icon={Clock} value={4} suffix={t('home.metricas.meses')} label={t('home.metricas.promedio')} start={metricsVisible} />
-            <MetricCard icon={Award} value={3} suffix="" label={t('home.metricas.alianzas')} start={metricsVisible} />
+            <MetricCard icon={Gauge} value={21} suffix="×" label={t('home.metricas.calificacion')} start={metricsVisible} />
+          </div>
+        </div>
+      </section>
+
+      {/* NIVELES DE INVOLUCRAMIENTO */}
+      <section className="py-24 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.niveles.etiqueta')}</span>
+            <h2 className="text-3xl sm:text-4xl font-black text-navy mb-4">
+              {t('home.niveles.titulo1')} <span className="text-brand">{t('home.niveles.titulo2')}</span>
+            </h2>
+            <p className="text-slate-600 max-w-xl mx-auto">{t('home.niveles.sub')}</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-5">
+            {t('home.niveles.items').map(({ modo, nombre, desc, nota }) => (
+              <div key={nombre} className="flex flex-col p-6 rounded-2xl border border-slate-200 hover:border-brand/30 transition-colors">
+                <span className="text-brand text-xs font-semibold uppercase tracking-widest">{modo}</span>
+                <h3 className="text-navy text-2xl font-black mt-2 mb-3">{nombre}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed flex-1">{desc}</p>
+                <p className="mt-4 flex items-center gap-2 text-slate-700 text-xs font-medium">
+                  <CheckCircle2 size={14} className="text-brand" />
+                  {nota}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-col md:flex-row md:items-center gap-5 p-6 rounded-2xl bg-brand-soft border border-brand/20">
+            <div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0">
+              <GraduationCap size={22} className="text-brand" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-navy font-bold text-lg">{t('home.niveles.aviTitulo')}</h3>
+              <p className="text-slate-700 text-sm leading-relaxed">{t('home.niveles.aviTexto')}</p>
+            </div>
+            <Link
+              to="/catalogo"
+              className="inline-flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-semibold text-sm px-5 py-3 rounded-lg transition-colors"
+            >
+              {t('home.niveles.aviCta')}
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* MÉTODO SOCIUS */}
+      <section className="py-24 px-4 bg-slate-50 border-y border-slate-200">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-14">
+            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.metodo.etiqueta')}</span>
+            <h2 className="text-3xl sm:text-4xl font-black text-navy">
+              {t('home.metodo.titulo1')} <span className="text-brand">{t('home.metodo.titulo2')}</span>
+            </h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {t('home.metodo.pasos').map(({ letra, titulo, desc }) => (
+              <div key={titulo} className="flex items-start gap-4 p-5 rounded-xl bg-white border border-slate-200">
+                <span aria-hidden="true" className="w-12 h-12 rounded-xl bg-brand text-white text-2xl font-black flex items-center justify-center flex-shrink-0">
+                  {letra}
+                </span>
+                <div>
+                  <h3 className="text-navy font-bold text-base mb-1">{titulo}</h3>
+                  <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
