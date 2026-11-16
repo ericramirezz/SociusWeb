@@ -10,7 +10,8 @@ import { seleccion } from '../core'
 const ESPERA = { timeout: 6000 }
 
 async function llenarContacto(user) {
-  await user.type(screen.getByLabelText('Nombre completo'), 'Ana Demo')
+  // El checkout muestra un indicador mientras carga la disponibilidad.
+  await user.type(await screen.findByLabelText('Nombre completo', {}, ESPERA), 'Ana Demo')
   await user.type(screen.getByLabelText('Empresa / Proyecto'), 'Inmobiliaria Demo')
   await user.type(screen.getByLabelText('Email'), 'ana@demo.mx')
   await user.type(screen.getByLabelText('Teléfono'), '5512345678')
@@ -28,7 +29,7 @@ describe('Flujo de compra en la interfaz', () => {
     seleccion.guardar(['nexus-growth', 'avi'])
     render(<App />)
 
-    expect(screen.getByText(/Fecha propuesta por el sistema/)).toBeTruthy()
+    expect(await screen.findByText(/Fecha propuesta por el sistema/, {}, ESPERA)).toBeTruthy()
     expect(screen.getByRole('button', { name: /Pagar \$87,000 MXN/ })).toBeTruthy()
 
     await llenarContacto(user)
@@ -70,7 +71,7 @@ describe('Flujo de compra en la interfaz', () => {
     const user = userEvent.setup()
     seleccion.guardar(['avi'])
     render(<App />)
-    await user.click(screen.getByRole('button', { name: /Pagar/ }))
+    await user.click(await screen.findByRole('button', { name: /Pagar/ }, ESPERA))
     expect(screen.getByText('Nombre requerido')).toBeTruthy()
     expect(screen.getByText('Email válido requerido')).toBeTruthy()
     expect(localStorage.getItem('socius_pedidos_v2')).toBeNull()

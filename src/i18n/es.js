@@ -31,6 +31,9 @@ export default {
     phTelefono: '+52 55 0000 0000',
     emailValido: 'Email válido requerido',
     procesando: 'Procesando…',
+    cargando: 'Cargando…',
+    errorCarga: 'No pudimos cargar la información. Revisa tu conexión.',
+    reintentar: 'Reintentar',
   },
 
   estados: {
@@ -229,6 +232,8 @@ export default {
     pagar: 'Pagar',
     resumen: 'Resumen del pedido',
     notaPublicidad: '* Presupuesto publicitario no incluido. Se cotiza por separado según el desarrollo.',
+    entraTitulo: 'Entra para finalizar tu compra',
+    entraTexto: 'Tu pedido quedará ligado a tu cuenta para que puedas darle seguimiento desde cualquier equipo. Tu selección se conserva.',
   },
 
   confirmacion: {
@@ -277,6 +282,8 @@ export default {
     cancelar: 'Cancelar pedido',
     devolucion: 'Solicitar devolución',
     mantener: 'No, mantener pedido',
+    entraTitulo: 'Entra para ver tus pedidos',
+    entraTexto: 'Tus pedidos están ligados a tu cuenta. Te enviamos un enlace a tu correo para entrar.',
     modal: {
       cancelar: {
         titulo: 'Confirmar cancelación',
@@ -298,6 +305,7 @@ export default {
     requerido: 'Campo requerido',
     seleccionaHorario: 'Selecciona un horario',
     noDisponible: 'Ese horario ya no está disponible',
+    errorGeneral: 'No pudimos agendar la llamada. Revisa tu conexión e intenta de nuevo.',
     tuInfo: 'Tu información',
     phEmpresa: 'Tu empresa',
     proyecto: 'Cuéntanos de tu proyecto (opcional)',

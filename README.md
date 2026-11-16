@@ -7,14 +7,16 @@ Aplicación web para Socius Real Estate Consulting: catálogo con precios, cotiz
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 30 casos de prueba (Vitest)
+npm test           # 38 casos de prueba (Vitest)
 npm run build      # versión de producción en dist/
 ```
 
 ## Estado actual
 
-- Frontend: React 18 + Vite + Tailwind + React Router. Sin backend todavía.
-- Datos en `localStorage` detrás de un Repository; al migrar a una base real solo cambia esa clase.
+- Frontend: React 18 + Vite + Tailwind + React Router.
+- Backend: Supabase (Postgres + autenticación). Con `.env.local` los pedidos, pagos y llamadas viven en la base y el cliente entra con un enlace a su correo; sin él, la app usa `localStorage` y no pide cuenta (así corren las pruebas).
+- Base de datos: `supabase/migrations/` se pega en orden en el SQL Editor de Supabase (001, 002…). Seguridad por fila: cada cliente ve solo sus pedidos.
+- `.env.local` (no se sube a git): `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`. Nunca la llave secreta.
 - Pagos **simulados** (Stripe, Mercado Pago y PayPal detrás de adaptadores). La integración real se hace en la fase de pruebas y requiere un backend: las llaves secretas nunca van en el frontend.
 - Tarjetas de prueba: `4242 4242 4242 4242` aprueba, `4000 0000 0000 0002` rechaza.
 
@@ -30,6 +32,9 @@ src/
     estadoOrden.js      State: los 7 estados y sus transiciones
     eventos.js          Observer: bus de eventos
     repositorio.js      Repository: memoria / localStorage
+    repositorioSupabase.js  Repository en Supabase: órdenes, partidas, pagos, llamadas
+    supabase.js         Cliente único de Supabase (null sin .env.local o en pruebas)
+    sesion.js           Servicio de sesión: enlace por correo, salir, avisos de cambio
     servicioPedidos.js  Facade: cotizar, comprar, cancelar, devolver, listar
     agendaLlamadas.js   Horarios de la llamada estratégica
     pagos/
@@ -38,7 +43,8 @@ src/
       decoradores.js        Decorator: bitácora, idempotencia, reintento
       fabricaPasarelas.js   Factory Method con registro
     __tests__/          Pruebas unitarias (CP-01 a CP-22)
-  __tests__/            Pruebas de interfaz (CP-23 a CP-28)
+  __tests__/            Pruebas de interfaz e integración con Supabase falso (CP-23 a CP-36)
+  sesion/               SesionContext (useSesion): usuario actual para las pantallas
   i18n/                 Idiomas: IdiomaContext (useIdioma, t), es.js, en.js
   pages/                Una pantalla por ruta (incluye /testimonios)
   components/           Navbar, SelectorIdioma, Footer, Modal, ProgramaCard, TestimonioCard,

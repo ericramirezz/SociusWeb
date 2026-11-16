@@ -11,8 +11,16 @@ export default function Cotizador() {
   const { t, fecha, cobro: detalleCobro } = useIdioma()
   const [seleccionados, setSeleccionados] = useState([])
 
+  // Arranques ya agendados por día: la fecha propuesta respeta el cupo diario.
+  const [ocupacion, setOcupacion] = useState({})
+
   useEffect(() => {
     setSeleccionados(seleccion.leer())
+    let vigente = true
+    pedidos.ocupacion().then((o) => vigente && setOcupacion(o)).catch(() => {})
+    return () => {
+      vigente = false
+    }
   }, [])
 
   const togglePrograma = (id) => {
@@ -24,7 +32,7 @@ export default function Cotizador() {
   }
 
   // La fachada cotiza: forma de pago (Strategy) y fecha de entrega por tipo de producto.
-  const cotizacion = pedidos.cotizar(seleccionados)
+  const cotizacion = pedidos.cotizar(seleccionados, ocupacion)
   const programasSeleccionados = cotizacion.partidas
 
   const handleIrAPago = () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { programas } from '../../data/programas'
-import { AgendaLlamadas } from '../agendaLlamadas'
+import { AgendaLlamadas, HORARIO_OCUPADO } from '../agendaLlamadas'
 import { ConfigApp } from '../config'
 import { resolverFechaCliente } from '../entrega'
 import { ESTADOS, transicionar } from '../estadoOrden'
@@ -151,7 +151,7 @@ describe('Facade + Observer · flujo de compra', () => {
     expect(eventos).toContain(EVENTOS.PAGO_RECHAZADO)
     const r2 = await servicio.comprar({ ids: ['avi'], cliente, tarjeta: TARJETA_APROBADA, ordenId: r1.orden.id })
     expect(r2.orden.id).toBe(r1.orden.id)
-    expect(servicio.listar()).toHaveLength(1)
+    expect(await servicio.listar()).toHaveLength(1)
   })
   it('CP-18 el tercer arranque del mismo día se mueve al siguiente día hábil', async () => {
     const { servicio } = montar()
@@ -167,14 +167,14 @@ describe('Facade + Observer · flujo de compra', () => {
     expect(final.estado).toBe('reembolsada')
     expect(final.reembolso.monto).toBe(80000)
     expect(eventos.slice(-2)).toEqual([EVENTOS.CANCELADA, EVENTOS.REEMBOLSADA])
-    expect(servicio.ocupacion()).toEqual({})
+    expect(await servicio.ocupacion()).toEqual({})
   })
   it('CP-20 la orden avanza sola con el calendario y admite devolución en curso', async () => {
     const { servicio, reloj } = montar()
     const { orden } = await servicio.comprar({ ids: ['nexus-growth'], cliente, tarjeta: TARJETA_APROBADA })
     reloj.ahora = new Date(2026, 11, 1)
-    expect(servicio.listar()[0].estado).toBe('en_curso')
-    expect(servicio.puedeCancelar(servicio.obtener(orden.id))).toBe(false)
+    expect((await servicio.listar())[0].estado).toBe('en_curso')
+    expect(servicio.puedeCancelar(await servicio.obtener(orden.id))).toBe(false)
     await expect(servicio.cancelar(orden.id)).rejects.toThrow(/Transición inválida/)
     expect((await servicio.solicitarDevolucion(orden.id)).estado).toBe('reembolsada')
   })
@@ -182,17 +182,17 @@ describe('Facade + Observer · flujo de compra', () => {
     const { servicio, reloj } = montar()
     await servicio.comprar({ ids: ['nexus-growth'], cliente, tarjeta: TARJETA_APROBADA })
     reloj.ahora = new Date(2027, 3, 1)
-    expect(servicio.listar()[0].estado).toBe('completada')
+    expect((await servicio.listar())[0].estado).toBe('completada')
   })
 })
 
 describe('Agenda de llamadas', () => {
-  it('CP-22 ofrece 5 días hábiles y no permite tomar dos veces el mismo horario', () => {
+  it('CP-22 ofrece 5 días hábiles y no permite tomar dos veces el mismo horario', async () => {
     const a = new AgendaLlamadas({ repoLlamadas: new RepositorioMemoria(), bus: new BusEventos(), reloj: () => LUNES })
-    const dias = a.horarios()
+    const dias = await a.horarios()
     expect(dias.map((d) => d.fecha)).toEqual(['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20', '2026-11-23'])
-    a.agendar({ cliente, fecha: '2026-11-17', hora: '10:00' })
-    expect(a.horarios()[0].horas).not.toContain('10:00')
-    expect(() => a.agendar({ cliente, fecha: '2026-11-17', hora: '10:00' })).toThrow()
+    await a.agendar({ cliente, fecha: '2026-11-17', hora: '10:00' })
+    expect((await a.horarios())[0].horas).not.toContain('10:00')
+    await expect(a.agendar({ cliente, fecha: '2026-11-17', hora: '10:00' })).rejects.toMatchObject({ codigo: HORARIO_OCUPADO })
   })
 })

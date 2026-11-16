@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Calendar, Clock, CheckCircle, ArrowRight, Phone, Mail, MessageSquare } from 'lucide-react'
 
-import { agenda, formatoLargo } from '../core'
+import { agenda, formatoLargo, HORARIO_OCUPADO } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
 
 const diaSemana = (iso, locale) => formatoLargo(iso, locale).split(',')[0]
@@ -13,8 +13,13 @@ export default function Agenda() {
   const [selectedSlot, setSelectedSlot] = useState({ fecha: '', hora: '' })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
-  // Próximos 5 días hábiles, sin los horarios que ya están tomados.
-  const [slots] = useState(() => agenda.horarios())
+  // Próximos 5 días hábiles, sin los horarios que ya están tomados (null mientras carga).
+  const [slots, setSlots] = useState(null)
+  const cargarHorarios = () => agenda.horarios().then(setSlots).catch(() => setSlots([]))
+
+  useEffect(() => {
+    cargarHorarios()
+  }, [])
 
   const validate = () => {
     const e = {}
@@ -32,7 +37,7 @@ export default function Agenda() {
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const e2 = validate()
     if (Object.keys(e2).length > 0) {
@@ -40,15 +45,20 @@ export default function Agenda() {
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
-      try {
-        agenda.agendar({ cliente: form, fecha: selectedSlot.fecha, hora: selectedSlot.hora })
-        setSubmitted(true)
-      } catch {
+    try {
+      await agenda.agendar({ cliente: form, fecha: selectedSlot.fecha, hora: selectedSlot.hora })
+      setSubmitted(true)
+    } catch (err) {
+      if (err.codigo === HORARIO_OCUPADO) {
         setErrors({ slot: t('agenda.noDisponible') })
+        setSelectedSlot({ fecha: '', hora: '' })
+        cargarHorarios() // alguien más lo tomó: se refresca la lista
+      } else {
+        setErrors({ slot: t('agenda.errorGeneral') })
       }
-    }, 800)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const inputClass = (field) =>
@@ -200,7 +210,10 @@ export default function Agenda() {
                   <p className="text-red-600 text-xs mb-3">{errors.slot}</p>
                 )}
                 <div className="space-y-5">
-                  {slots.map((slot) => (
+                  {slots === null && (
+                    <div className="w-6 h-6 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
+                  )}
+                  {slots?.map((slot) => (
                     <div key={slot.fecha}>
                       <p className="text-slate-600 text-xs uppercase tracking-wider mb-2">
                         {fecha(slot.fecha)}

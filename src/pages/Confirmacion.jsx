@@ -11,12 +11,18 @@ export default function Confirmacion() {
   const [orden, setOrden] = useState(null)
 
   useEffect(() => {
-    const encontrada = pedidos.obtener(localStorage.getItem('socius_ultima_orden'))
-    if (!encontrada) {
-      navigate('/')
-      return
+    let vigente = true
+    pedidos
+      .obtener(localStorage.getItem('socius_ultima_orden'))
+      .then((encontrada) => {
+        if (!vigente) return
+        if (encontrada) setOrden(encontrada)
+        else navigate('/')
+      })
+      .catch(() => vigente && navigate('/'))
+    return () => {
+      vigente = false
     }
-    setOrden(encontrada)
   }, [navigate])
 
   if (!orden) return null

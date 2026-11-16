@@ -1,28 +1,46 @@
 // PATRÓN: Repository (acceso a datos).
-// Las pantallas y el servicio piden "guardar" o "listar" sin saber dónde viven
-// los datos. Hoy: localStorage. En pruebas: memoria. Después: Supabase, con la
-// misma interfaz { listar, obtener, guardar, borrar }.
+// El servicio pide "guardar" u "obtener" sin saber dónde viven los datos.
+// Interfaz común, toda asíncrona porque una base remota responde por la red:
+//   listar() · obtener(id) · guardar(entidad) → entidad con id · borrar(id)
+// Implementaciones: memoria (pruebas), localStorage (sin Supabase) y Supabase
+// (repositorioSupabase.js).
+
+// Si la entidad llega sin id, se le asigna el siguiente: SOC-100001, SOC-100002…
+// (el mismo formato que genera la base de datos).
+function siguienteId(lista, prefijo) {
+  const max = lista.reduce((m, x) => {
+    const n = Number(String(x.id ?? '').slice(prefijo.length))
+    return Number.isFinite(n) ? Math.max(m, n) : m
+  }, 100000)
+  return `${prefijo}${max + 1}`
+}
+
 export class RepositorioMemoria {
   #datos = new Map()
-  listar() {
+  constructor({ prefijoId = 'SOC-' } = {}) {
+    this.prefijoId = prefijoId
+  }
+  async listar() {
     return [...this.#datos.values()]
   }
-  obtener(id) {
+  async obtener(id) {
     return this.#datos.get(id) ?? null
   }
-  guardar(entidad) {
-    this.#datos.set(entidad.id, entidad)
-    return entidad
+  async guardar(entidad) {
+    const conId = entidad.id ? entidad : { ...entidad, id: siguienteId([...this.#datos.values()], this.prefijoId) }
+    this.#datos.set(conId.id, conId)
+    return conId
   }
-  borrar(id) {
+  async borrar(id) {
     this.#datos.delete(id)
   }
 }
 
 export class RepositorioLocalStorage {
-  constructor(clave, almacen = globalThis.localStorage) {
+  constructor(clave, { almacen = globalThis.localStorage, prefijoId = 'SOC-' } = {}) {
     this.clave = clave
     this.almacen = almacen
+    this.prefijoId = prefijoId
   }
   #leer() {
     try {
@@ -34,21 +52,22 @@ export class RepositorioLocalStorage {
   #escribir(lista) {
     this.almacen.setItem(this.clave, JSON.stringify(lista))
   }
-  listar() {
+  async listar() {
     return this.#leer()
   }
-  obtener(id) {
+  async obtener(id) {
     return this.#leer().find((x) => x.id === id) ?? null
   }
-  guardar(entidad) {
+  async guardar(entidad) {
     const lista = this.#leer()
-    const i = lista.findIndex((x) => x.id === entidad.id)
-    if (i >= 0) lista[i] = entidad
-    else lista.unshift(entidad)
+    const conId = entidad.id ? entidad : { ...entidad, id: siguienteId(lista, this.prefijoId) }
+    const i = lista.findIndex((x) => x.id === conId.id)
+    if (i >= 0) lista[i] = conId
+    else lista.unshift(conId)
     this.#escribir(lista)
-    return entidad
+    return conId
   }
-  borrar(id) {
+  async borrar(id) {
     this.#escribir(this.#leer().filter((x) => x.id !== id))
   }
 }

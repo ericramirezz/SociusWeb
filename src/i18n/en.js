@@ -28,6 +28,9 @@ export default {
     phTelefono: '+52 55 0000 0000',
     emailValido: 'Valid email required',
     procesando: 'Processing…',
+    cargando: 'Loading…',
+    errorCarga: "We couldn't load the information. Check your connection.",
+    reintentar: 'Try again',
   },
 
   estados: {
@@ -259,6 +262,8 @@ export default {
     pagar: 'Pay',
     resumen: 'Order summary',
     notaPublicidad: '* Advertising budget not included. It is quoted separately for each development.',
+    entraTitulo: 'Sign in to complete your purchase',
+    entraTexto: 'Your order will be linked to your account so you can track it from any device. Your selection is kept.',
   },
 
   confirmacion: {
@@ -307,6 +312,8 @@ export default {
     cancelar: 'Cancel order',
     devolucion: 'Request refund',
     mantener: 'No, keep order',
+    entraTitulo: 'Sign in to see your orders',
+    entraTexto: "Your orders are linked to your account. We'll email you a link to sign in.",
     modal: {
       cancelar: {
         titulo: 'Confirm cancellation',
@@ -328,6 +335,7 @@ export default {
     requerido: 'Required field',
     seleccionaHorario: 'Select a time slot',
     noDisponible: 'That time slot is no longer available',
+    errorGeneral: "We couldn't book the call. Check your connection and try again.",
     tuInfo: 'Your information',
     phEmpresa: 'Your company',
     proyecto: 'Tell us about your project (optional)',

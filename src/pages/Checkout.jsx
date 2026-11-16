@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { CreditCard, Lock, ArrowRight, AlertCircle, Calendar, CheckCircle, Zap } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { CreditCard, Lock, ArrowRight, AlertCircle, Calendar, CheckCircle, Zap, LogIn } from 'lucide-react'
 import {
   pedidos, seleccion, fabricaPasarelas, config, formatoMoneda,
   TARJETA_APROBADA, TARJETA_RECHAZADA,
 } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { useSesion } from '../sesion/SesionContext'
 
 // label y placeholder son claves del diccionario (i18n/es.js, en.js).
 const CAMPOS = [
@@ -28,17 +29,36 @@ export default function Checkout() {
   const [tarjeta, setTarjeta] = useState(TARJETA_APROBADA)
   const [ordenId, setOrdenId] = useState(null) // si el pago se rechaza, se reintenta sobre la misma orden
   const [errorPago, setErrorPago] = useState('')
+  const [fechaPreferida, setFechaPreferida] = useState('') // vacía = la que propone el sistema
+  const [ocupacion, setOcupacion] = useState(null) // arranques por día; null mientras carga
 
-  // La fachada cotiza y propone la fecha de entrega según el tipo de producto.
-  const cotizacion = pedidos.cotizar(seleccionados)
+  // Con Supabase activo, comprar requiere sesión (la base liga la orden a la cuenta).
+  const { usuario, disponible: hayCuentas, cargando: cargandoSesion } = useSesion()
+  const faltaSesion = hayCuentas && !cargandoSesion && !usuario
+
+  // La fachada cotiza y propone la fecha de entrega según el tipo de producto y el cupo diario.
+  const cotizacion = pedidos.cotizar(seleccionados, ocupacion ?? {})
   const propuesta = cotizacion.entregaPropuesta
-  const [fechaPreferida, setFechaPreferida] = useState(propuesta?.fechaArranque ?? '')
+  const fechaElegida = fechaPreferida || propuesta?.fechaArranque || ''
   // El cliente propone su fecha: se confirma o se sugiere la más cercana.
-  const revision = cotizacion.requiereAgenda && fechaPreferida ? pedidos.revisarFecha(fechaPreferida) : null
+  const revision = cotizacion.requiereAgenda && fechaElegida ? pedidos.revisarFecha(fechaElegida, ocupacion ?? {}) : null
 
   useEffect(() => {
     if (seleccionados.length === 0) navigate('/cotizador')
   }, [seleccionados, navigate])
+
+  useEffect(() => {
+    let vigente = true
+    pedidos.ocupacion().then((o) => vigente && setOcupacion(o)).catch(() => vigente && setOcupacion({}))
+    return () => {
+      vigente = false
+    }
+  }, [])
+
+  // Con sesión, el correo de la cuenta se llena solo.
+  useEffect(() => {
+    if (usuario?.email) setForm((f) => (f.email ? f : { ...f, email: usuario.email }))
+  }, [usuario])
 
   const validate = () => {
     const e = {}
@@ -88,6 +108,33 @@ export default function Checkout() {
   const labelClass = 'text-slate-600 text-xs uppercase tracking-wider mb-2 block'
   const cardClass = 'p-6 rounded-2xl border border-slate-200 bg-white shadow-sm'
 
+  if (faltaSesion) {
+    return (
+      <div className="min-h-screen bg-brand-soft/40 pt-28 pb-20 px-4">
+        <div className={`${cardClass} max-w-md mx-auto text-center`}>
+          <LogIn size={32} className="mx-auto text-brand mb-4" />
+          <h1 className="text-navy font-black text-2xl mb-2">{t('checkout.entraTitulo')}</h1>
+          <p className="text-slate-600 text-sm mb-6">{t('checkout.entraTexto')}</p>
+          <Link
+            to="/entrar?volver=/checkout"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors"
+          >
+            {t('nav.entrar')}
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (ocupacion === null || cargandoSesion) {
+    return (
+      <div className="min-h-screen bg-brand-soft/40 pt-28 pb-20 px-4 flex justify-center">
+        <div className="w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-brand-soft/40 pt-24 pb-20 px-4">
       <div className="max-w-6xl mx-auto">
@@ -135,7 +182,7 @@ export default function Checkout() {
                     <input
                       id="fecha"
                       type="date"
-                      value={fechaPreferida}
+                      value={fechaElegida}
                       onChange={(e) => setFechaPreferida(e.target.value)}
                       min={propuesta.fechaArranque}
                       className={inputClass('fecha')}

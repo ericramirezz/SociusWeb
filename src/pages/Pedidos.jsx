@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Package, Calendar, AlertTriangle, XCircle, ChevronDown, ChevronUp, ShoppingBag, RotateCcw, CreditCard } from 'lucide-react'
+import { Package, Calendar, AlertTriangle, XCircle, ChevronDown, ChevronUp, ShoppingBag, RotateCcw, CreditCard, LogIn, ArrowRight } from 'lucide-react'
 import Modal from '../components/Modal'
 import EstadoBadge from '../components/EstadoBadge'
 import { pedidos as servicio, ESTADOS, formatoMoneda } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { useSesion } from '../sesion/SesionContext'
 
 const fechaCorta = (iso, locale) => new Date(iso).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })
 const fechaHora = (iso, locale) => new Date(iso).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -148,9 +149,28 @@ export default function Pedidos() {
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [filtro, setFiltro] = useState('todos')
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState(false)
 
-  const recargar = useCallback(() => setPedidos(servicio.listar()), [])
-  useEffect(recargar, [recargar])
+  // Con Supabase activo, los pedidos son de la cuenta: sin sesión no hay qué mostrar.
+  const { usuario, disponible: hayCuentas, cargando: cargandoSesion } = useSesion()
+  const faltaSesion = hayCuentas && !cargandoSesion && !usuario
+
+  const recargar = useCallback(async () => {
+    try {
+      setPedidos(await servicio.listar())
+      setErrorCarga(false)
+    } catch {
+      setErrorCarga(true)
+    } finally {
+      setCargando(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (cargandoSesion || faltaSesion) return
+    recargar()
+  }, [recargar, cargandoSesion, faltaSesion, usuario?.id])
 
   const cerrar = () => {
     if (procesando) return
@@ -168,8 +188,27 @@ export default function Pedidos() {
       setError(e.message)
     } finally {
       setProcesando(false)
-      recargar()
+      await recargar()
     }
+  }
+
+  if (faltaSesion) {
+    return (
+      <div className="min-h-screen bg-brand-soft/40 pt-28 pb-20 px-4">
+        <div className="max-w-md mx-auto text-center p-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <LogIn size={32} className="mx-auto text-brand mb-4" />
+          <h1 className="text-navy font-black text-2xl mb-2">{t('pedidos.entraTitulo')}</h1>
+          <p className="text-slate-600 text-sm mb-6">{t('pedidos.entraTexto')}</p>
+          <Link
+            to="/entrar?volver=/pedidos"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors"
+          >
+            {t('nav.entrar')}
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   const filtros = ['todos', ...Object.values(ESTADOS)]
@@ -203,7 +242,17 @@ export default function Pedidos() {
           ))}
         </div>
 
-        {pedidosFiltrados.length === 0 ? (
+        {cargando || cargandoSesion ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
+          </div>
+        ) : errorCarga ? (
+          <div className="flex flex-col items-center py-20 text-center" role="alert">
+            <AlertTriangle size={28} className="text-amber-600 mb-3" />
+            <p className="text-slate-700 font-medium mb-4">{t('comun.errorCarga')}</p>
+            <button onClick={recargar} className="text-brand text-sm font-semibold hover:text-brand-dark">{t('comun.reintentar')}</button>
+          </div>
+        ) : pedidosFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-16 h-16 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-4">
               <Package size={28} className="text-slate-400" />
