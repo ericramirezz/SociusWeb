@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, ChevronRight } from 'lucide-react'
 import { useIdioma } from '../i18n/IdiomaContext'
 import SelectorIdioma from './SelectorIdioma'
+import MenuCuenta from './MenuCuenta'
 
 const navLinks = [
   { clave: 'inicio', href: '/' },
@@ -64,6 +65,7 @@ export default function Navbar() {
           {/* Idioma + CTA */}
           <div className="hidden lg:flex items-center gap-2">
             <SelectorIdioma />
+            <MenuCuenta />
             <Link
               to="/agenda"
               className="flex items-center gap-1 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-md transition-all duration-200"
@@ -76,6 +78,7 @@ export default function Navbar() {
           {/* Mobile: idioma + hamburguesa */}
           <div className="lg:hidden flex items-center gap-1">
             <SelectorIdioma />
+            <MenuCuenta />
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="p-2 rounded-md text-slate-700 hover:text-navy hover:bg-slate-100 transition-colors"

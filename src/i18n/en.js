@@ -11,6 +11,9 @@ export default {
     ctaMovil: 'Book a strategy call',
     abrirMenu: 'Open menu',
     idioma: 'Change language',
+    entrar: 'Sign in',
+    salir: 'Sign out',
+    cuenta: 'My account',
   },
 
   comun: {
@@ -349,6 +352,22 @@ export default {
     horaCdmx: '{hora} (Mexico City time)',
     contacto: 'Contact',
     teContactara: 'A Socius strategist will contact you at {email} to confirm and send the video call link.',
+  },
+
+  entrar: {
+    etiqueta: 'My account',
+    titulo: 'Sign in to Socius',
+    subtitulo: "We'll email you a sign-in link. That way you can see your orders from any device.",
+    enviar: 'Email me the link',
+    sinContrasena: 'No passwords: each link works only once.',
+    revisaCorreo: 'Check your email',
+    enviadoA: 'We sent a sign-in link to:',
+    abreEnlace: "Open it in this same browser. If it doesn't arrive in a few minutes, check your spam folder.",
+    otroCorreo: 'Use a different email',
+    yaDentro: "You're signed in",
+    limite: 'Too many emails were sent in a short time. Wait a few minutes and try again.',
+    errorGeneral: "We couldn't send the link. Try again in a few minutes.",
+    noDisponible: 'Accounts are not set up yet on this copy of the site.',
   },
 
   notif: {

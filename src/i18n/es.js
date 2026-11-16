@@ -14,6 +14,9 @@ export default {
     ctaMovil: 'Agendar llamada estratégica',
     abrirMenu: 'Abrir menú',
     idioma: 'Cambiar idioma',
+    entrar: 'Entrar',
+    salir: 'Salir',
+    cuenta: 'Mi cuenta',
   },
 
   comun: {
@@ -319,6 +322,22 @@ export default {
     horaCdmx: '{hora} hrs (hora CDMX)',
     contacto: 'Contacto',
     teContactara: 'Un estratega de Socius te contactará al {email} para confirmar y enviar el enlace de la videollamada.',
+  },
+
+  entrar: {
+    etiqueta: 'Mi cuenta',
+    titulo: 'Entrar a Socius',
+    subtitulo: 'Te enviamos un enlace a tu correo para entrar. Así ves tus pedidos desde cualquier equipo.',
+    enviar: 'Enviarme el enlace',
+    sinContrasena: 'Sin contraseñas: cada enlace sirve una sola vez.',
+    revisaCorreo: 'Revisa tu correo',
+    enviadoA: 'Enviamos un enlace de acceso a:',
+    abreEnlace: 'Ábrelo en este mismo navegador. Si no llega en unos minutos, revisa la carpeta de spam.',
+    otroCorreo: 'Usar otro correo',
+    yaDentro: 'Ya entraste',
+    limite: 'Se enviaron demasiados correos en poco tiempo. Espera unos minutos e intenta de nuevo.',
+    errorGeneral: 'No pudimos enviar el enlace. Intenta de nuevo en unos minutos.',
+    noDisponible: 'Las cuentas todavía no están configuradas en esta copia del sitio.',
   },
 
   notif: {

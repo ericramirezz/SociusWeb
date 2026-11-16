@@ -7,6 +7,8 @@ import { BusEventos, EVENTOS } from './eventos'
 import { FabricaPasarelas } from './pagos/fabricaPasarelas'
 import { RepositorioLocalStorage } from './repositorio'
 import { ServicioPedidos } from './servicioPedidos'
+import { ServicioSesion } from './sesion'
+import { supabase } from './supabase'
 
 export const config = ConfigApp.obtener()
 export const bus = new BusEventos()
@@ -20,6 +22,8 @@ export const pedidos = new ServicioPedidos({
   catalogo: programas,
 })
 
+export const sesion = new ServicioSesion({ cliente: supabase })
+
 export const agenda = new AgendaLlamadas({ repoLlamadas: new RepositorioLocalStorage('socius_llamadas'), bus })
 
 // Observador de bitácora: escucha TODOS los eventos. Aquí se conectarían después
@@ -29,5 +33,6 @@ bus.suscribir('*', (datos, evento) => console.info(`[evento] ${evento}`, datos?.
 export { EVENTOS }
 export { ESTADOS, ETIQUETAS } from './estadoOrden'
 export { seleccion } from './seleccion'
+export { ERRORES_SESION } from './sesion'
 export { formatoLargo, formatoMoneda, aISO } from './fechas'
 export { TARJETA_APROBADA, TARJETA_RECHAZADA } from './pagos/sdkSimulados'
