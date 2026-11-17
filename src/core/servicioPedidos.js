@@ -88,6 +88,8 @@ export class ServicioPedidos {
       totalContrato: cot.totalContrato,
       moneda: this.config.moneda,
       requiereAgenda: cot.requiereAgenda,
+      // Se guarda para que, si el pago lo confirma después un webhook, se respete la fecha que eligió el cliente.
+      fechaPreferida: fechaCliente ?? null,
     }
     // El repositorio asigna el número de orden (SOC-100001…) la primera vez.
     orden = await this.repoPedidos.guardar(orden)
@@ -101,20 +103,39 @@ export class ServicioPedidos {
       return { ok: false, orden, mensaje: cobro.mensaje }
     }
 
-    orden = transicionar(orden, 'pagar', this.reloj())
-    orden.pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy }
+    const pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy }
+    orden = await this.#aplicarPago(orden, pago, fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion)
+    return { ok: true, orden }
+  }
+
+  // Pago confirmado por la pasarela desde su servidor (webhook), no por el navegador.
+  // Es idempotente: si la orden ya no está cotizada, el pago ya se había aplicado y no cambia nada.
+  async confirmarPago(id, pago) {
+    const orden = await this.#obtener(id)
+    if (orden.estado !== ESTADOS.COTIZADA) return { aplicado: false, orden }
+    if (Number(pago.monto) !== Number(orden.totalHoy)) {
+      throw new Error(`El monto pagado (${pago.monto}) no coincide con el de la orden ${id} (${orden.totalHoy})`)
+    }
+    const ocupacion = await this.ocupacion()
+    const propuesta = orden.fechaPreferida ?? this.cotizar(orden.partidas.map((p) => p.id), ocupacion).entregaPropuesta?.fechaArranque
+    return { aplicado: true, orden: await this.#aplicarPago(orden, pago, propuesta, ocupacion) }
+  }
+
+  // Lo que pasa después de un cobro aprobado, venga del checkout o de un webhook:
+  // la orden queda pagada y luego agendada (servicio) o completada (digital).
+  async #aplicarPago(orden, pago, fechaPropuesta, ocupacion) {
+    orden = { ...transicionar(orden, 'pagar', this.reloj()), pago }
     this.bus.publicar(EVENTOS.PAGADA, orden)
 
     if (orden.requiereAgenda) {
-      const fecha = this.revisarFecha(fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion)
+      const fecha = this.revisarFecha(fechaPropuesta, ocupacion)
       orden = { ...transicionar(orden, 'agendar', this.reloj()), ...calendarioServicio(deISO(fecha.fecha), this.config), fechaAjustada: !fecha.confirmada }
       this.bus.publicar(EVENTOS.AGENDADA, orden)
     } else {
       // Producto digital: acceso inmediato una vez confirmado el pago.
       orden = { ...transicionar(orden, 'completar', this.reloj()), fechaEntrega: aISO(this.reloj()) }
     }
-    orden = await this.repoPedidos.guardar(orden)
-    return { ok: true, orden }
+    return this.repoPedidos.guardar(orden)
   }
 
   // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa.

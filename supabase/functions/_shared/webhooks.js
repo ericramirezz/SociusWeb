@@ -1,0 +1,778 @@
+// ARCHIVO GENERADO por `npm run build:funciones` desde src/core. No editar a mano.
+
+// src/core/config.js
+var ConfigApp = class _ConfigApp {
+  static #instancia = null;
+  constructor() {
+    if (_ConfigApp.#instancia) {
+      throw new Error("ConfigApp es Singleton: usa ConfigApp.obtener()");
+    }
+    this.moneda = "MXN";
+    this.diasHabilesMinimosArranque = 5;
+    this.diasPrimeraVersion = 15;
+    this.mesesPrograma = 4;
+    this.arranquesPorDia = 2;
+    this.pasarelaPorDefecto = "stripe";
+    Object.freeze(this);
+  }
+  static obtener() {
+    if (!_ConfigApp.#instancia) _ConfigApp.#instancia = new _ConfigApp();
+    return _ConfigApp.#instancia;
+  }
+};
+
+// src/core/eventos.js
+var BusEventos = class {
+  #suscriptores = /* @__PURE__ */ new Map();
+  suscribir(evento, fn) {
+    if (!this.#suscriptores.has(evento)) this.#suscriptores.set(evento, /* @__PURE__ */ new Set());
+    this.#suscriptores.get(evento).add(fn);
+    return () => this.#suscriptores.get(evento)?.delete(fn);
+  }
+  publicar(evento, datos) {
+    const interesados = [...this.#suscriptores.get(evento) ?? [], ...this.#suscriptores.get("*") ?? []];
+    interesados.forEach((fn) => fn(datos, evento));
+  }
+};
+var EVENTOS = Object.freeze({
+  COTIZADA: "orden.cotizada",
+  PAGADA: "orden.pagada",
+  AGENDADA: "orden.agendada",
+  CANCELADA: "orden.cancelada",
+  REEMBOLSADA: "orden.reembolsada",
+  PAGO_RECHAZADO: "pago.rechazado",
+  LLAMADA_AGENDADA: "llamada.agendada"
+});
+
+// src/core/repositorioSupabase.js
+var SELECCION_ORDEN = "*, partidas(*), pagos(*)";
+var num = (v) => v == null ? v : Number(v);
+function aOrden(fila) {
+  const pago = fila.pagos?.[0];
+  return {
+    id: fila.id,
+    estado: fila.estado,
+    historial: fila.historial ?? [],
+    cliente: fila.cliente,
+    partidas: (fila.partidas ?? []).slice().sort((a, b) => a.id - b.id).map((p) => ({
+      id: p.programa_id,
+      nombre: p.nombre,
+      tipo: p.tipo,
+      precio: num(p.precio),
+      cobroHoy: num(p.cobro_hoy),
+      totalContrato: num(p.total_contrato)
+    })),
+    totalHoy: num(fila.total_hoy),
+    totalContrato: num(fila.total_contrato),
+    moneda: fila.moneda,
+    requiereAgenda: fila.requiere_agenda,
+    pago: pago ? { pasarela: pago.pasarela, idTransaccion: pago.id_transaccion, monto: num(pago.monto) } : null,
+    fechaArranque: fila.fecha_arranque,
+    fechaEntrega: fila.fecha_entrega,
+    fechaFin: fila.fecha_fin,
+    fechaAjustada: fila.fecha_ajustada,
+    fechaPreferida: fila.fecha_preferida ?? null,
+    reembolso: fila.reembolso,
+    fechaOrden: fila.fecha_orden
+  };
+}
+function aFilaEditable(orden) {
+  return {
+    cliente: orden.cliente,
+    estado: orden.estado,
+    historial: orden.historial ?? [],
+    total_hoy: orden.totalHoy,
+    total_contrato: orden.totalContrato,
+    requiere_agenda: Boolean(orden.requiereAgenda),
+    fecha_arranque: orden.fechaArranque ?? null,
+    fecha_entrega: orden.fechaEntrega ?? null,
+    fecha_fin: orden.fechaFin ?? null,
+    fecha_ajustada: Boolean(orden.fechaAjustada),
+    fecha_preferida: orden.fechaPreferida ?? null,
+    reembolso: orden.reembolso ?? null
+  };
+}
+var aFilasPartidas = (ordenId, partidas = []) => partidas.map((p) => ({
+  orden_id: ordenId,
+  programa_id: p.id,
+  nombre: p.nombre,
+  tipo: p.tipo,
+  precio: p.precio,
+  cobro_hoy: p.cobroHoy,
+  total_contrato: p.totalContrato
+}));
+function errorDeBase(error, mensaje) {
+  const e = new Error(mensaje);
+  e.causa = error;
+  e.codigo = error?.code;
+  return e;
+}
+var RepositorioPedidosSupabase = class {
+  constructor(cliente) {
+    this.cliente = cliente;
+  }
+  async listar() {
+    const { data, error } = await this.cliente.from("ordenes").select(SELECCION_ORDEN).order("fecha_orden", { ascending: false });
+    if (error) throw errorDeBase(error, "No se pudieron cargar los pedidos");
+    return data.map(aOrden);
+  }
+  async obtener(id) {
+    if (!id) return null;
+    const { data, error } = await this.cliente.from("ordenes").select(SELECCION_ORDEN).eq("id", id).maybeSingle();
+    if (error) throw errorDeBase(error, "No se pudo cargar el pedido");
+    return data ? aOrden(data) : null;
+  }
+  async guardar(orden) {
+    const id = orden.id ? await this.#actualizar(orden) : await this.#crear(orden);
+    if (orden.pago) await this.#registrarPago(id, orden.pago);
+    return { ...orden, id };
+  }
+  async borrar() {
+    throw new Error("Las \xF3rdenes no se borran: se cancelan");
+  }
+  // Cupo de arranques por día de TODOS los clientes, sin datos personales
+  // (función arranques_por_dia de la migración 002). Devuelve { 'YYYY-MM-DD': n }.
+  async arranquesPorDia(desde) {
+    const { data, error } = await this.cliente.rpc("arranques_por_dia", { desde });
+    if (error) throw errorDeBase(error, "No se pudo consultar la disponibilidad");
+    return Object.fromEntries(data.map((r) => [r.fecha, r.arranques]));
+  }
+  async #crear(orden) {
+    const { data: sesion } = await this.cliente.auth.getSession();
+    const uid = sesion.session?.user?.id;
+    if (!uid) throw new Error("Necesitas iniciar sesi\xF3n para comprar");
+    const fila = { ...aFilaEditable(orden), cliente_id: uid, moneda: orden.moneda ?? "MXN" };
+    if (orden.fechaOrden) fila.fecha_orden = orden.fechaOrden;
+    const { data, error } = await this.cliente.from("ordenes").insert(fila).select("id").single();
+    if (error) throw errorDeBase(error, "No se pudo crear el pedido");
+    await this.#reemplazarPartidas(data.id, orden.partidas);
+    return data.id;
+  }
+  async #actualizar(orden) {
+    if (orden.estado === "cotizada" && orden.partidas) await this.#reemplazarPartidas(orden.id, orden.partidas);
+    const { error } = await this.cliente.from("ordenes").update(aFilaEditable(orden)).eq("id", orden.id);
+    if (error) throw errorDeBase(error, "No se pudo actualizar el pedido");
+    return orden.id;
+  }
+  async #reemplazarPartidas(ordenId, partidas) {
+    const borrado = await this.cliente.from("partidas").delete().eq("orden_id", ordenId);
+    if (borrado.error) throw errorDeBase(borrado.error, "No se pudieron guardar los programas del pedido");
+    const filas = aFilasPartidas(ordenId, partidas);
+    if (filas.length === 0) return;
+    const { error } = await this.cliente.from("partidas").insert(filas);
+    if (error) throw errorDeBase(error, "No se pudieron guardar los programas del pedido");
+  }
+  async #registrarPago(ordenId, pago) {
+    const { error } = await this.cliente.from("pagos").upsert(
+      { orden_id: ordenId, pasarela: pago.pasarela, id_transaccion: pago.idTransaccion, monto: pago.monto },
+      { onConflict: "pasarela,id_transaccion", ignoreDuplicates: true }
+    );
+    if (error) throw errorDeBase(error, "No se pudo registrar el pago");
+  }
+};
+
+// src/core/fechas.js
+var aISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+var deISO = (iso) => {
+  const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(a, m - 1, d);
+};
+var esHabil = (d) => d.getDay() !== 0 && d.getDay() !== 6;
+function sumarDias(fecha, dias) {
+  const r = new Date(fecha);
+  r.setDate(r.getDate() + dias);
+  return r;
+}
+function sumarDiasHabiles(fecha, dias) {
+  let r = new Date(fecha);
+  let contados = 0;
+  while (contados < dias) {
+    r = sumarDias(r, 1);
+    if (esHabil(r)) contados++;
+  }
+  return r;
+}
+function sumarMeses(fecha, meses) {
+  const r = new Date(fecha);
+  r.setMonth(r.getMonth() + meses);
+  return r;
+}
+
+// src/core/entrega.js
+function entregaInmediata(hoy) {
+  return { tipo: "digital", fechaEntrega: aISO(hoy), descripcion: "Acceso inmediato al confirmar el pago" };
+}
+function entregaServicio(hoy, config, ocupacion = {}) {
+  const minimo = sumarDiasHabiles(hoy, config.diasHabilesMinimosArranque);
+  const arranque = primerDiaDisponible(minimo, config, ocupacion);
+  return { tipo: "servicio", ...calendarioServicio(arranque, config) };
+}
+function calendarioServicio(arranque, config) {
+  return {
+    fechaArranque: aISO(arranque),
+    fechaEntrega: aISO(sumarDias(arranque, config.diasPrimeraVersion)),
+    // primera versión operando
+    fechaFin: aISO(sumarMeses(arranque, config.mesesPrograma)),
+    descripcion: `Primera versi\xF3n operando ${config.diasPrimeraVersion} d\xEDas despu\xE9s del arranque`
+  };
+}
+var hayDisponibilidad = (fecha, config, ocupacion = {}) => esHabil(fecha) && (ocupacion[aISO(fecha)] ?? 0) < config.arranquesPorDia;
+function primerDiaDisponible(desde, config, ocupacion = {}) {
+  let d = new Date(desde);
+  while (!hayDisponibilidad(d, config, ocupacion)) d = sumarDias(d, 1);
+  return d;
+}
+function resolverFechaCliente(fechaISO, hoy, config, ocupacion = {}) {
+  const minimo = deISO(aISO(sumarDiasHabiles(hoy, config.diasHabilesMinimosArranque)));
+  const pedida = deISO(fechaISO);
+  if (pedida >= minimo && hayDisponibilidad(pedida, config, ocupacion)) {
+    return { confirmada: true, fecha: fechaISO, motivo: null, codigo: null };
+  }
+  const base = pedida < minimo ? minimo : pedida;
+  const sugerida = aISO(primerDiaDisponible(base, config, ocupacion));
+  const codigo = pedida < minimo ? "anticipacion" : !esHabil(pedida) ? "finDeSemana" : "sinLugar";
+  const motivo = {
+    anticipacion: `Se necesitan al menos ${config.diasHabilesMinimosArranque} d\xEDas h\xE1biles de anticipaci\xF3n`,
+    finDeSemana: "Los arranques son de lunes a viernes",
+    sinLugar: "Ese d\xEDa ya no tiene lugares"
+  }[codigo];
+  return { confirmada: false, fecha: sugerida, motivo, codigo };
+}
+var ESTRATEGIAS_COBRO = {
+  unico: (precio) => ({ hoy: precio, totalContrato: precio, detalle: "Pago \xFAnico" }),
+  dos_pagos: (precio) => ({ hoy: precio / 2, totalContrato: precio, detalle: "2 pagos: 50% hoy y 50% al mes 2" }),
+  mensual: (precio, config) => ({
+    hoy: precio,
+    totalContrato: precio * config.mesesPrograma,
+    detalle: `${config.mesesPrograma} mensualidades; hoy se cobra la primera`
+  })
+};
+
+// src/core/estadoOrden.js
+var ESTADOS = Object.freeze({
+  COTIZADA: "cotizada",
+  PAGADA: "pagada",
+  AGENDADA: "agendada",
+  EN_CURSO: "en_curso",
+  COMPLETADA: "completada",
+  CANCELADA: "cancelada",
+  REEMBOLSADA: "reembolsada"
+});
+var E = ESTADOS;
+var TRANSICIONES = {
+  [E.COTIZADA]: { pagar: E.PAGADA, cancelar: E.CANCELADA },
+  [E.PAGADA]: { agendar: E.AGENDADA, completar: E.COMPLETADA, cancelar: E.CANCELADA, reembolsar: E.REEMBOLSADA },
+  [E.AGENDADA]: { iniciar: E.EN_CURSO, cancelar: E.CANCELADA, reembolsar: E.REEMBOLSADA },
+  [E.EN_CURSO]: { completar: E.COMPLETADA, reembolsar: E.REEMBOLSADA },
+  [E.COMPLETADA]: { reembolsar: E.REEMBOLSADA },
+  [E.CANCELADA]: { reembolsar: E.REEMBOLSADA },
+  [E.REEMBOLSADA]: {}
+};
+var ETIQUETAS = {
+  [E.COTIZADA]: "Cotizada",
+  [E.PAGADA]: "Pagada",
+  [E.AGENDADA]: "Agendada",
+  [E.EN_CURSO]: "En curso",
+  [E.COMPLETADA]: "Completada",
+  [E.CANCELADA]: "Cancelada",
+  [E.REEMBOLSADA]: "Reembolsada"
+};
+var puede = (orden, evento) => Boolean(TRANSICIONES[orden.estado]?.[evento]);
+function transicionar(orden, evento, ahora = /* @__PURE__ */ new Date()) {
+  const siguiente = TRANSICIONES[orden.estado]?.[evento];
+  if (!siguiente) {
+    throw new Error(`Transici\xF3n inv\xE1lida: no se puede "${evento}" una orden ${ETIQUETAS[orden.estado] ?? orden.estado}`);
+  }
+  return {
+    ...orden,
+    estado: siguiente,
+    historial: [...orden.historial ?? [], { estado: siguiente, evento, fecha: ahora.toISOString() }]
+  };
+}
+
+// src/core/productos.js
+var Producto = class {
+  constructor(datos) {
+    Object.assign(this, datos);
+  }
+  cobro(config) {
+    return ESTRATEGIAS_COBRO[this.formaPago ?? "unico"](this.precio, config);
+  }
+};
+var ProductoDigital = class extends Producto {
+  requiereAgenda = false;
+  etiquetaTipo = "Producto digital";
+  entrega(hoy) {
+    return entregaInmediata(hoy);
+  }
+};
+var Servicio = class extends Producto {
+  requiereAgenda = true;
+  etiquetaTipo = "Servicio";
+  entrega(hoy, config, ocupacion) {
+    return entregaServicio(hoy, config, ocupacion);
+  }
+};
+var REGISTRO = { digital: ProductoDigital, servicio: Servicio };
+function crearProducto(datos) {
+  const Clase = REGISTRO[datos.tipo];
+  if (!Clase) throw new Error(`Tipo de producto desconocido: ${datos.tipo}`);
+  return new Clase(datos);
+}
+
+// src/core/servicioPedidos.js
+var ACTIVAS = [ESTADOS.AGENDADA, ESTADOS.EN_CURSO];
+var ServicioPedidos = class {
+  // fuenteOcupacion (opcional): async (desdeISO) => { 'YYYY-MM-DD': arranques }.
+  // Con Supabase la da la base (el cliente no ve las órdenes de otros);
+  // sin ella se cuenta sobre las órdenes del repositorio.
+  constructor({ repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj = () => /* @__PURE__ */ new Date(), fuenteOcupacion = null }) {
+    Object.assign(this, { repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj, fuenteOcupacion });
+  }
+  // Cuántos arranques hay ya agendados por día: { '2026-12-01': 2, ... }
+  async ocupacion() {
+    if (this.fuenteOcupacion) return this.fuenteOcupacion(aISO(this.reloj()));
+    const cuenta = {};
+    for (const o of await this.repoPedidos.listar()) {
+      if (ACTIVAS.includes(o.estado) && o.fechaArranque) cuenta[o.fechaArranque] = (cuenta[o.fechaArranque] ?? 0) + 1;
+    }
+    return cuenta;
+  }
+  // Cotiza uno o varios productos con la ocupación dada. No guarda nada.
+  cotizar(ids, ocupacion = {}) {
+    const hoy = this.reloj();
+    const partidas = this.catalogo.filter((p) => ids.includes(p.id)).map((datos) => {
+      const producto = crearProducto(datos);
+      return { producto, cobro: producto.cobro(this.config), entrega: producto.entrega(hoy, this.config, ocupacion) };
+    });
+    const servicios = partidas.filter((x) => x.producto.requiereAgenda);
+    return {
+      partidas,
+      totalHoy: partidas.reduce((s, x) => s + x.cobro.hoy, 0),
+      totalContrato: partidas.reduce((s, x) => s + x.cobro.totalContrato, 0),
+      requiereAgenda: servicios.length > 0,
+      // Todos los servicios de una orden arrancan el mismo día.
+      entregaPropuesta: servicios[0]?.entrega ?? partidas[0]?.entrega ?? null
+    };
+  }
+  // El cliente propone fecha de arranque: se confirma o se sugiere la más cercana.
+  revisarFecha(fechaISO, ocupacion = {}) {
+    return resolverFechaCliente(fechaISO, this.reloj(), this.config, ocupacion);
+  }
+  // Compra completa: crea la orden, cobra, y la agenda (servicio) o la entrega (digital).
+  async comprar({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, tarjeta, fechaCliente, ordenId }) {
+    const ocupacion = await this.ocupacion();
+    const cot = this.cotizar(ids, ocupacion);
+    if (cot.partidas.length === 0) throw new Error("La cotizaci\xF3n est\xE1 vac\xEDa");
+    let orden = ordenId ? await this.repoPedidos.obtener(ordenId) : null;
+    const nueva = !orden || orden.estado !== ESTADOS.COTIZADA;
+    if (nueva) {
+      const ahora = this.reloj();
+      orden = {
+        estado: ESTADOS.COTIZADA,
+        historial: [{ estado: ESTADOS.COTIZADA, evento: "cotizar", fecha: ahora.toISOString() }],
+        fechaOrden: ahora.toISOString()
+      };
+    }
+    orden = {
+      ...orden,
+      cliente,
+      partidas: cot.partidas.map(({ producto, cobro: cobro2 }) => ({
+        id: producto.id,
+        nombre: producto.nombre,
+        tipo: producto.tipo,
+        precio: producto.precio,
+        cobroHoy: cobro2.hoy,
+        totalContrato: cobro2.totalContrato
+      })),
+      totalHoy: cot.totalHoy,
+      totalContrato: cot.totalContrato,
+      moneda: this.config.moneda,
+      requiereAgenda: cot.requiereAgenda,
+      // Se guarda para que, si el pago lo confirma después un webhook, se respete la fecha que eligió el cliente.
+      fechaPreferida: fechaCliente ?? null
+    };
+    orden = await this.repoPedidos.guardar(orden);
+    if (nueva) this.bus.publicar(EVENTOS.COTIZADA, orden);
+    const cobro = await this.fabricaPasarelas.crearPasarela(pasarela).cobrar({
+      monto: orden.totalHoy,
+      moneda: orden.moneda,
+      referencia: orden.id,
+      tarjeta
+    });
+    if (!cobro.ok) {
+      this.bus.publicar(EVENTOS.PAGO_RECHAZADO, { orden, mensaje: cobro.mensaje });
+      return { ok: false, orden, mensaje: cobro.mensaje };
+    }
+    const pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy };
+    orden = await this.#aplicarPago(orden, pago, fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion);
+    return { ok: true, orden };
+  }
+  // Pago confirmado por la pasarela desde su servidor (webhook), no por el navegador.
+  // Es idempotente: si la orden ya no está cotizada, el pago ya se había aplicado y no cambia nada.
+  async confirmarPago(id, pago) {
+    const orden = await this.#obtener(id);
+    if (orden.estado !== ESTADOS.COTIZADA) return { aplicado: false, orden };
+    if (Number(pago.monto) !== Number(orden.totalHoy)) {
+      throw new Error(`El monto pagado (${pago.monto}) no coincide con el de la orden ${id} (${orden.totalHoy})`);
+    }
+    const ocupacion = await this.ocupacion();
+    const propuesta = orden.fechaPreferida ?? this.cotizar(orden.partidas.map((p) => p.id), ocupacion).entregaPropuesta?.fechaArranque;
+    return { aplicado: true, orden: await this.#aplicarPago(orden, pago, propuesta, ocupacion) };
+  }
+  // Lo que pasa después de un cobro aprobado, venga del checkout o de un webhook:
+  // la orden queda pagada y luego agendada (servicio) o completada (digital).
+  async #aplicarPago(orden, pago, fechaPropuesta, ocupacion) {
+    orden = { ...transicionar(orden, "pagar", this.reloj()), pago };
+    this.bus.publicar(EVENTOS.PAGADA, orden);
+    if (orden.requiereAgenda) {
+      const fecha = this.revisarFecha(fechaPropuesta, ocupacion);
+      orden = { ...transicionar(orden, "agendar", this.reloj()), ...calendarioServicio(deISO(fecha.fecha), this.config), fechaAjustada: !fecha.confirmada };
+      this.bus.publicar(EVENTOS.AGENDADA, orden);
+    } else {
+      orden = { ...transicionar(orden, "completar", this.reloj()), fechaEntrega: aISO(this.reloj()) };
+    }
+    return this.repoPedidos.guardar(orden);
+  }
+  // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa.
+  async cancelar(id) {
+    let orden = await this.#obtener(id);
+    orden = transicionar(orden, "cancelar", this.reloj());
+    orden = await this.repoPedidos.guardar(orden);
+    this.bus.publicar(EVENTOS.CANCELADA, orden);
+    return orden.pago ? this.#reembolsar(orden) : orden;
+  }
+  // Devolución: orden en curso o completada.
+  async solicitarDevolucion(id) {
+    return this.#reembolsar(await this.#obtener(id));
+  }
+  puedeCancelar = (orden) => puede(orden, "cancelar");
+  puedeDevolver = (orden) => Boolean(orden.pago) && puede(orden, "reembolsar") && !puede(orden, "cancelar");
+  // Lista las órdenes, avanzando las que ya llegaron a su fecha (agendada → en curso → completada).
+  async listar() {
+    const hoy = aISO(this.reloj());
+    const ordenes = await this.repoPedidos.listar();
+    return Promise.all(ordenes.map(async (o) => {
+      let orden = o;
+      if (orden.estado === ESTADOS.AGENDADA && orden.fechaArranque <= hoy) orden = transicionar(orden, "iniciar", this.reloj());
+      if (orden.estado === ESTADOS.EN_CURSO && orden.fechaFin <= hoy) orden = transicionar(orden, "completar", this.reloj());
+      return orden !== o ? this.repoPedidos.guardar(orden) : orden;
+    }));
+  }
+  obtener(id) {
+    return this.repoPedidos.obtener(id);
+  }
+  async #obtener(id) {
+    const orden = await this.repoPedidos.obtener(id);
+    if (!orden) throw new Error(`No existe la orden ${id}`);
+    return orden;
+  }
+  async #reembolsar(orden) {
+    if (!orden.pago) throw new Error("La orden no tiene un pago que reembolsar");
+    if (!puede(orden, "reembolsar")) transicionar(orden, "reembolsar");
+    const r = await this.fabricaPasarelas.crearPasarela(orden.pago.pasarela).reembolsar({
+      idTransaccion: orden.pago.idTransaccion,
+      monto: orden.pago.monto,
+      moneda: orden.moneda
+    });
+    if (!r.ok) throw new Error("La pasarela no pudo emitir el reembolso");
+    let reembolsada = { ...transicionar(orden, "reembolsar", this.reloj()), reembolso: { idReembolso: r.idReembolso, monto: orden.pago.monto } };
+    reembolsada = await this.repoPedidos.guardar(reembolsada);
+    this.bus.publicar(EVENTOS.REEMBOLSADA, reembolsada);
+    return reembolsada;
+  }
+};
+
+// src/data/programas.js
+var programas = [
+  {
+    id: "nexus-growth",
+    tipo: "servicio",
+    formaPago: "unico",
+    nombre: "Nexus Growth",
+    precio: 8e4,
+    moneda: "MXN",
+    descripcion: "Infraestructura completa, operada por Socius",
+    paraQuien: "Quien quiere que se lo operen",
+    pago: "Pago en los primeros 30 d\xEDas",
+    destacado: true
+  },
+  {
+    id: "nexus-growth-split",
+    tipo: "servicio",
+    formaPago: "mensual",
+    nombre: "Nexus Growth Split",
+    precio: 35e3,
+    moneda: "MXN/mes",
+    descripcion: "La misma modalidad, mes a mes",
+    paraQuien: "Mismo perfil, pago fraccionado",
+    pago: "Mensual",
+    destacado: false
+  },
+  {
+    id: "nexus-partner",
+    tipo: "servicio",
+    formaPago: "unico",
+    nombre: "Nexus Partner",
+    precio: 6e4,
+    moneda: "MXN",
+    descripcion: "Infraestructura completa y comisi\xF3n por venta",
+    paraQuien: "Quien prefiere que Socius participe del resultado",
+    pago: "M\xE1s comisi\xF3n",
+    destacado: true
+  },
+  {
+    id: "nexus-partner-split",
+    tipo: "servicio",
+    formaPago: "mensual",
+    nombre: "Nexus Partner Split",
+    precio: 2e4,
+    moneda: "MXN/mes",
+    descripcion: "La misma modalidad, mes a mes",
+    paraQuien: "Mismo perfil, pago fraccionado",
+    pago: "Mensual + comisi\xF3n",
+    destacado: false
+  },
+  {
+    id: "socius-core",
+    tipo: "servicio",
+    formaPago: "dos_pagos",
+    nombre: "Socius Core",
+    precio: 15e4,
+    moneda: "MXN",
+    descripcion: "Se instala, opera y capacita al equipo interno del cliente",
+    paraQuien: "Desarrolladores y brokers con equipo interno",
+    pago: "2 pagos",
+    destacado: true
+  },
+  {
+    id: "nexus-ia",
+    tipo: "servicio",
+    formaPago: "unico",
+    nombre: "Nexus IA",
+    precio: 35e3,
+    moneda: "MXN",
+    descripcion: "Capa de IA y CRM: 2 agentes que responden, califican y agendan",
+    paraQuien: "Quien ya genera prospectos",
+    pago: "Setup + desde $10,000/mes",
+    destacado: false
+  },
+  {
+    id: "avi",
+    tipo: "digital",
+    formaPago: "unico",
+    nombre: "AVI",
+    precio: 7e3,
+    moneda: "MXN",
+    descripcion: "Programa formativo con agentes de IA",
+    paraQuien: "Quien quiere aprender a hacerlo",
+    pago: "Pago \xFAnico",
+    destacado: false
+  }
+];
+
+// src/core/webhooks/firmas.js
+var texto = new TextEncoder();
+async function hmacHex(secreto, mensaje) {
+  const llave = await crypto.subtle.importKey("raw", texto.encode(secreto), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const firma = await crypto.subtle.sign("HMAC", llave, texto.encode(mensaje));
+  return [...new Uint8Array(firma)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function igualSeguro(a = "", b = "") {
+  if (a.length !== b.length) return false;
+  let diferencia = 0;
+  for (let i = 0; i < a.length; i++) diferencia |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diferencia === 0;
+}
+function partes(encabezado = "") {
+  const r = {};
+  for (const par of encabezado.split(",")) {
+    const [k, ...v] = par.trim().split("=");
+    if (k && v.length) (r[k] ??= []).push(v.join("="));
+  }
+  return r;
+}
+var mal = (motivo) => ({ ok: false, motivo });
+var TOLERANCIA_SEGUNDOS = 300;
+async function verificarStripe(cuerpo, encabezados, secreto, ahora) {
+  const p = partes(encabezados["stripe-signature"]);
+  const t = p.t?.[0];
+  if (!t || !p.v1) return mal("sin_firma");
+  if (Math.abs(ahora.getTime() / 1e3 - Number(t)) > TOLERANCIA_SEGUNDOS) return mal("firma_vencida");
+  const esperada = await hmacHex(secreto, `${t}.${cuerpo}`);
+  return p.v1.some((v) => igualSeguro(v, esperada)) ? { ok: true } : mal("firma_invalida");
+}
+async function verificarMercadoPago(cuerpo, encabezados, secreto) {
+  const p = partes(encabezados["x-signature"]);
+  const ts = p.ts?.[0];
+  const v1 = p.v1?.[0];
+  if (!ts || !v1) return mal("sin_firma");
+  let dataId;
+  try {
+    dataId = String(JSON.parse(cuerpo)?.data?.id ?? "");
+  } catch {
+    return mal("json_invalido");
+  }
+  const idFirmado = /^[a-z0-9]+$/i.test(dataId) ? dataId.toLowerCase() : dataId;
+  const esperada = await hmacHex(secreto, `id:${idFirmado};request-id:${encabezados["x-request-id"] ?? ""};ts:${ts};`);
+  return igualSeguro(v1, esperada) ? { ok: true } : mal("firma_invalida");
+}
+var VERIFICADORES = {
+  stripe: verificarStripe,
+  mercadopago: verificarMercadoPago
+};
+
+// src/core/webhooks/traductores.js
+var TIPOS = Object.freeze({
+  APROBADO: "pago_aprobado",
+  RECHAZADO: "pago_rechazado",
+  CONSULTAR: "consultar_pago",
+  OTRO: "otro"
+});
+function traducirStripe(datos) {
+  const objeto = datos?.data?.object ?? {};
+  const tipo = {
+    "payment_intent.succeeded": TIPOS.APROBADO,
+    "payment_intent.payment_failed": TIPOS.RECHAZADO
+  }[datos?.type] ?? TIPOS.OTRO;
+  return {
+    eventoId: datos?.id,
+    tipo,
+    referencia: objeto.metadata?.orden_id ?? null,
+    idTransaccion: objeto.id ?? null,
+    monto: objeto.amount != null ? objeto.amount / 100 : null
+  };
+}
+function traducirMercadoPago(datos) {
+  const idPago = datos?.data?.id != null ? String(datos.data.id) : null;
+  return {
+    eventoId: String(datos?.id ?? `${datos?.action}:${idPago}`),
+    tipo: datos?.type === "payment" && idPago ? TIPOS.CONSULTAR : TIPOS.OTRO,
+    idPago,
+    referencia: null,
+    idTransaccion: idPago,
+    monto: null
+  };
+}
+var TRADUCTORES = {
+  stripe: traducirStripe,
+  mercadopago: traducirMercadoPago
+};
+
+// src/core/webhooks/receptor.js
+async function recibirWebhook({ pasarela, cuerpo, encabezados = {}, secretos = {}, cola, reloj = () => /* @__PURE__ */ new Date() }) {
+  const verificar = VERIFICADORES[pasarela];
+  if (!verificar) return { status: 404, motivo: "pasarela_desconocida" };
+  const secreto = secretos[pasarela];
+  if (!secreto) return { status: 500, motivo: "sin_secreto" };
+  const enc = Object.fromEntries(Object.entries(encabezados).map(([k, v]) => [k.toLowerCase(), v]));
+  const firma = await verificar(cuerpo, enc, secreto, reloj());
+  if (!firma.ok) return { status: 400, motivo: firma.motivo };
+  let datos;
+  try {
+    datos = JSON.parse(cuerpo);
+  } catch {
+    return { status: 400, motivo: "json_invalido" };
+  }
+  const evento = TRADUCTORES[pasarela](datos);
+  if (!evento.eventoId) return { status: 400, motivo: "sin_id_de_evento" };
+  const { nuevo } = await cola.encolar({ pasarela, eventoId: evento.eventoId, tipo: evento.tipo, contenido: datos });
+  return { status: 200, motivo: nuevo ? "recibido" : "duplicado" };
+}
+
+// src/core/webhooks/colaEventos.js
+var ESTADOS_EVENTO = Object.freeze({
+  PENDIENTE: "pendiente",
+  PROCESANDO: "procesando",
+  PROCESADO: "procesado",
+  ERROR: "error"
+});
+var MAX_INTENTOS = 3;
+var siguienteEstado = (intentos, max) => intentos >= max ? ESTADOS_EVENTO.ERROR : ESTADOS_EVENTO.PENDIENTE;
+var aEvento = (f) => ({
+  id: f.id,
+  pasarela: f.pasarela,
+  eventoId: f.evento_id,
+  tipo: f.tipo,
+  contenido: f.contenido,
+  estado: f.estado,
+  intentos: f.intentos,
+  ultimoError: f.ultimo_error ?? null
+});
+var ColaEventosSupabase = class {
+  constructor(cliente) {
+    this.cliente = cliente;
+  }
+  async encolar({ pasarela, eventoId, tipo, contenido }) {
+    const { data, error } = await this.cliente.from("eventos_pago").upsert({ pasarela, evento_id: eventoId, tipo, contenido }, { onConflict: "pasarela,evento_id", ignoreDuplicates: true }).select("id");
+    if (error) throw new Error(`No se pudo guardar el aviso: ${error.message}`);
+    return { nuevo: data.length > 0 };
+  }
+  // La función tomar_eventos_pago (migración 003) usa "for update skip locked":
+  // si dos consumidores corren a la vez, cada aviso lo toma solo uno.
+  async tomar(limite = 10) {
+    const { data, error } = await this.cliente.rpc("tomar_eventos_pago", { limite });
+    if (error) throw new Error(`No se pudieron tomar los avisos: ${error.message}`);
+    return data.map(aEvento);
+  }
+  async marcarProcesado(evento) {
+    const { error } = await this.cliente.from("eventos_pago").update({ estado: ESTADOS_EVENTO.PROCESADO, procesado_en: (/* @__PURE__ */ new Date()).toISOString(), ultimo_error: null }).eq("id", evento.id);
+    if (error) throw new Error(`No se pudo marcar el aviso: ${error.message}`);
+  }
+  async registrarFallo(evento, mensaje, max = MAX_INTENTOS) {
+    const intentos = evento.intentos + 1;
+    const { error } = await this.cliente.from("eventos_pago").update({ intentos, ultimo_error: mensaje, estado: siguienteEstado(intentos, max) }).eq("id", evento.id);
+    if (error) throw new Error(`No se pudo registrar el fallo: ${error.message}`);
+  }
+};
+
+// src/core/webhooks/procesador.js
+async function procesarPendientes({ cola, servicio, consultores = {}, limite = 10, maxIntentos = MAX_INTENTOS }) {
+  const resumen = { procesados: 0, fallidos: 0 };
+  for (const evento of await cola.tomar(limite)) {
+    try {
+      await aplicar(evento, servicio, consultores);
+      await cola.marcarProcesado(evento);
+      resumen.procesados++;
+    } catch (e) {
+      await cola.registrarFallo(evento, e.message, maxIntentos);
+      resumen.fallidos++;
+    }
+  }
+  return resumen;
+}
+async function aplicar(evento, servicio, consultores) {
+  let datos = TRADUCTORES[evento.pasarela](evento.contenido);
+  if (datos.tipo === TIPOS.CONSULTAR) {
+    const consultar = consultores[evento.pasarela];
+    if (!consultar) throw new Error(`Falta conectar la consulta a la API de ${evento.pasarela} (Sprint 7)`);
+    const pago = await consultar(datos.idPago);
+    datos = { ...pago, tipo: pago.estado === "aprobado" ? TIPOS.APROBADO : TIPOS.OTRO };
+  }
+  if (datos.tipo !== TIPOS.APROBADO) return;
+  if (!datos.referencia) throw new Error("El aviso no trae el n\xFAmero de orden");
+  await servicio.confirmarPago(datos.referencia, {
+    pasarela: evento.pasarela,
+    idTransaccion: datos.idTransaccion,
+    monto: datos.monto
+  });
+}
+
+// src/core/webhooks/servidor.js
+function crearServicioServidor(cliente) {
+  const repo = new RepositorioPedidosSupabase(cliente);
+  return new ServicioPedidos({
+    repoPedidos: repo,
+    fabricaPasarelas: null,
+    bus: new BusEventos(),
+    config: ConfigApp.obtener(),
+    catalogo: programas,
+    fuenteOcupacion: (desde) => repo.arranquesPorDia(desde)
+  });
+}
+export {
+  ColaEventosSupabase,
+  crearServicioServidor,
+  procesarPendientes,
+  recibirWebhook
+};

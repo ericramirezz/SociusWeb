@@ -7,8 +7,10 @@ Aplicación web para Socius Real Estate Consulting: catálogo con precios, cotiz
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 38 casos de prueba (Vitest)
+npm test           # 43 casos de prueba (Vitest)
 npm run build      # versión de producción en dist/
+npm run build:funciones   # empaqueta src/core para las Edge Functions (supabase/functions/_shared/)
+npm run simular:webhook -- --url … --secreto … --orden SOC-… --monto …   # manda un aviso de pago firmado
 ```
 
 ## Estado actual
@@ -18,6 +20,7 @@ npm run build      # versión de producción en dist/
 - Base de datos: `supabase/migrations/` se pega en orden en el SQL Editor de Supabase (001, 002…). Seguridad por fila: cada cliente ve solo sus pedidos.
 - `.env.local` (no se sube a git): `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`. Nunca la llave secreta.
 - Pagos **simulados** (Stripe, Mercado Pago y PayPal detrás de adaptadores). La integración real se hace en la fase de pruebas y requiere un backend: las llaves secretas nunca van en el frontend.
+- Webhooks de pago firmados (Función 2): la pasarela avisa a la Edge Function `webhook-pagos`, que revisa la firma HMAC, guarda el aviso en la cola `eventos_pago` y responde; el consumidor lo aplica a la orden con reintentos (ver "Webhooks" abajo).
 - Tarjetas de prueba: `4242 4242 4242 4242` aprueba, `4000 0000 0000 0002` rechaza.
 
 ## Estructura
@@ -37,12 +40,19 @@ src/
     sesion.js           Servicio de sesión: enlace por correo, salir, avisos de cambio
     servicioPedidos.js  Facade: cotizar, comprar, cancelar, devolver, listar
     agendaLlamadas.js   Horarios de la llamada estratégica
+    webhooks/           Función 2: avisos de pago de las pasarelas
+      firmas.js             Verifica la firma HMAC-SHA256 (Stripe, Mercado Pago)
+      traductores.js        Adapter: cada aviso queda como { tipo, referencia, monto… }
+      colaEventos.js        Cola de avisos: memoria / tabla eventos_pago
+      receptor.js           Productor: firma → cola → responde
+      procesador.js         Consumidor: aplica el pago a la orden, reintenta 3 veces
+      servidor.js           Lo que usan las Edge Functions (se empaqueta)
     pagos/
       sdkSimulados.js       Imitan la forma de respuesta de cada proveedor
       adaptadores.js        Adapter: un contrato cobrar()/reembolsar() para los tres
       decoradores.js        Decorator: bitácora, idempotencia, reintento
       fabricaPasarelas.js   Factory Method con registro
-    __tests__/          Pruebas unitarias (CP-01 a CP-22)
+    __tests__/          Pruebas unitarias (CP-01 a CP-22) y de webhooks (CP-37 a CP-41)
   __tests__/            Pruebas de interfaz e integración con Supabase falso (CP-23 a CP-36)
   sesion/               SesionContext (useSesion): usuario actual para las pantallas
   i18n/                 Idiomas: IdiomaContext (useIdioma, t), es.js, en.js
@@ -52,7 +62,23 @@ src/
   data/programas.js     Catálogo
   data/testimonios.js   Testimonios (texto, foto, video y traducción)
 public/testimonios/     Fotos y videos de los testimonios
+supabase/
+  migrations/           SQL que se corre en orden en el SQL Editor (001, 002, 003…)
+  functions/            Edge Functions: webhook-pagos y procesar-eventos
+    _shared/webhooks.js Generado por `npm run build:funciones`; no editar a mano
+scripts/                construir-funciones.mjs, simular-webhook.mjs
 ```
+
+## Webhooks de pago
+
+1. La pasarela manda un aviso a `…/functions/v1/webhook-pagos/<stripe|mercadopago>`.
+2. **Productor** (`receptor.js`): revisa la firma con el secreto compartido. Si no coincide, o el aviso tiene más de 5 minutos, responde 400 y no guarda nada. Si es válida, lo guarda en `eventos_pago` y responde 200 de inmediato. Un aviso repetido responde "duplicado" y no se guarda dos veces.
+3. **Consumidor** (`procesador.js`): toma los pendientes con `tomar_eventos_pago` (`for update skip locked`, así dos procesos no toman el mismo) y llama a `ServicioPedidos.confirmarPago`, que usa la misma tabla de estados que el checkout. Si falla, reintenta; al tercer fallo el aviso queda en `error` con el motivo.
+4. Si la orden ya estaba pagada, no cambia nada (idempotencia). Si el monto no coincide con el de la orden, no se aplica.
+
+Mercado Pago solo avisa "cambió el pago X": el consumidor consulta su API para saber el estado (se conecta en el Sprint 7). PayPal verifica sus avisos por API; también en el Sprint 7.
+
+Secretos de las Edge Functions (Supabase → Edge Functions → Secrets): `STRIPE_WEBHOOK_SECRET`, `MERCADOPAGO_WEBHOOK_SECRET`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase solo.
 
 ## Idiomas
 
@@ -82,6 +108,7 @@ Regla: las pantallas solo hablan con `core/index.js` (`pedidos`, `agenda`, `bus`
 | State | Qué se puede hacer con una orden según su estado | `core/estadoOrden.js` |
 | Repository | Cambiar dónde se guardan los datos sin tocar pantallas | `core/repositorio.js` |
 | Facade | Una interfaz simple sobre todo lo anterior | `core/servicioPedidos.js` |
+| Productor/Consumidor | Recibir el aviso de la pasarela sin esperar a procesarlo, sin perderlo si algo falla | `core/webhooks/receptor.js`, `procesador.js`, `colaEventos.js` |
 
 Antipatrones que evitamos: Singleton como estado global (la configuración se inyecta), "Factory" cosmética con `if/elif`, y capas de más (regla de tres, YAGNI).
 
@@ -108,6 +135,6 @@ Blanco y azules. Tokens en `tailwind.config.js`: `brand` (#1D4ED8), `brand-dark`
 
 ## Pendiente
 
-1. Integración real en modo prueba de Stripe, Mercado Pago y PayPal (requiere backend).
-2. Base de datos (el anteproyecto propone Supabase) sustituyendo `RepositorioLocalStorage`.
+1. Integración real en modo prueba de Stripe, Mercado Pago y PayPal: cobrar desde Edge Functions, consultar el pago de Mercado Pago, verificar avisos de PayPal y quitar las políticas TEMPORAL de la migración 001.
+2. Correo propio (SMTP) para el enlace de acceso antes de la demo.
 3. Documento final, presentación con mockup, diagrama de contexto y demo.

@@ -1,0 +1,27 @@
+// Todo lo que necesitan las Edge Functions de supabase/functions/.
+// `npm run build:funciones` empaqueta este archivo (y lo que importa) en
+// supabase/functions/_shared/webhooks.js, porque Supabase solo publica lo que
+// está dentro de supabase/functions.
+import { ConfigApp } from '../config'
+import { BusEventos } from '../eventos'
+import { RepositorioPedidosSupabase } from '../repositorioSupabase'
+import { ServicioPedidos } from '../servicioPedidos'
+import { programas } from '../../data/programas'
+
+export { recibirWebhook } from './receptor'
+export { procesarPendientes } from './procesador'
+export { ColaEventosSupabase } from './colaEventos'
+
+// El mismo ServicioPedidos de la app, pero con el cliente de Supabase del servidor
+// (llave de servicio). No cobra nada: solo aplica pagos ya confirmados.
+export function crearServicioServidor(cliente) {
+  const repo = new RepositorioPedidosSupabase(cliente)
+  return new ServicioPedidos({
+    repoPedidos: repo,
+    fabricaPasarelas: null,
+    bus: new BusEventos(),
+    config: ConfigApp.obtener(),
+    catalogo: programas,
+    fuenteOcupacion: (desde) => repo.arranquesPorDia(desde),
+  })
+}

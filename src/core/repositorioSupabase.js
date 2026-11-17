@@ -37,6 +37,7 @@ export function aOrden(fila) {
     fechaEntrega: fila.fecha_entrega,
     fechaFin: fila.fecha_fin,
     fechaAjustada: fila.fecha_ajustada,
+    fechaPreferida: fila.fecha_preferida ?? null,
     reembolso: fila.reembolso,
     fechaOrden: fila.fecha_orden,
   }
@@ -55,6 +56,7 @@ export function aFilaEditable(orden) {
     fecha_entrega: orden.fechaEntrega ?? null,
     fecha_fin: orden.fechaFin ?? null,
     fecha_ajustada: Boolean(orden.fechaAjustada),
+    fecha_preferida: orden.fechaPreferida ?? null,
     reembolso: orden.reembolso ?? null,
   }
 }

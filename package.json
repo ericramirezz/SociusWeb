@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:funciones": "node scripts/construir-funciones.mjs",
+    "simular:webhook": "node scripts/simular-webhook.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
