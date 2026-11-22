@@ -31,7 +31,9 @@ export function parametrosPreferencia(orden, origen) {
     },
     statement_descriptor: 'SOCIUS',
   }
-  if (orden.cliente?.email) p.payer = { email: orden.cliente.email }
+  // No se manda payer.email: si ese correo es una cuenta real de Mercado Pago y las
+  // credenciales son de prueba, Mercado Pago rechaza el pago ("una de las partes es de
+  // prueba"). El comprador escribe su correo en la página de Mercado Pago.
   // El regreso automático solo se acepta con sitios https; en localhost el cliente
   // da clic en "Volver al sitio" después de pagar.
   if (origen.startsWith('https://')) p.auto_return = 'approved'

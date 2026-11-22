@@ -365,7 +365,6 @@ function parametrosPreferencia(orden, origen) {
     },
     statement_descriptor: "SOCIUS"
   };
-  if (orden.cliente?.email) p.payer = { email: orden.cliente.email };
   if (origen.startsWith("https://")) p.auto_return = "approved";
   return p;
 }

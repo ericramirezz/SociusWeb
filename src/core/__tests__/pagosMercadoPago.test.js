@@ -59,6 +59,7 @@ describe('Pago con la página de Mercado Pago (Sprint 7)', () => {
       failure: `${ORIGEN}/checkout?cancelado=SOC-100009`,
     })
     expect(p.auto_return).toBeUndefined() // en localhost no; con https sí
+    expect(p.payer).toBeUndefined() // un correo real con credenciales de prueba hace fallar el pago
     expect(parametrosPreferencia(orden, 'https://socius.mx').auto_return).toBe('approved')
 
     const { fetch, llamadas } = fetchFalso({
