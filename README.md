@@ -80,6 +80,29 @@ Mercado Pago solo avisa "cambió el pago X": el consumidor consulta su API para 
 
 Secretos de las Edge Functions (Supabase → Edge Functions → Secrets): `STRIPE_WEBHOOK_SECRET`, `MERCADOPAGO_WEBHOOK_SECRET`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase solo.
 
+### Publicar las funciones (ya hecho el 21/nov/2026; repetir si cambia `src/core`)
+
+```bash
+npx supabase login                                   # en una terminal propia (abre el navegador)
+npx supabase link --project-ref wfhwrblshkdbrkskfmrt
+# Secreto de prueba: se guarda en .env.local (no se sube) y en Supabase. Mientras sea simulado, el mismo para las dos.
+SECRETO=$(openssl rand -hex 32)
+printf '\nWEBHOOK_SECRETO_PRUEBA=%s\n' "$SECRETO" >> .env.local
+npx supabase secrets set STRIPE_WEBHOOK_SECRET=$SECRETO MERCADOPAGO_WEBHOOK_SECRET=$SECRETO
+npm run build:funciones
+npx supabase functions deploy webhook-pagos --no-verify-jwt --use-api   # la firma la autentica, no la sesión
+npx supabase functions deploy procesar-eventos --use-api                 # solo con la llave de servicio
+```
+
+Prueba de punta a punta: pagar en la app con la tarjeta de rechazo para dejar una orden *cotizada*, y luego
+
+```bash
+npm run simular:webhook -- --url https://wfhwrblshkdbrkskfmrt.supabase.co/functions/v1/webhook-pagos/stripe \
+  --secreto "$(grep '^WEBHOOK_SECRETO_PRUEBA=' .env.local | cut -d= -f2)" --orden SOC-… --monto <total_hoy> --repetir
+```
+
+Debe responder `recibido` y luego `duplicado`; en `eventos_pago` queda un solo aviso `procesado` (`intentos` cuenta solo los fallos) y la orden pasa a *pagada* o *agendada*. Sin firma, `webhook-pagos` responde 400; sin llave, `procesar-eventos` responde 401.
+
 ## Idiomas
 
 Español (Latinoamérica) e English (US), con el ícono de mundo del menú. La elección se guarda en el navegador.
