@@ -326,8 +326,9 @@ var ServicioPedidos = class {
   // fuenteOcupacion (opcional): async (desdeISO) => { 'YYYY-MM-DD': arranques }.
   // Con Supabase la da la base (el cliente no ve las órdenes de otros);
   // sin ella se cuenta sobre las órdenes del repositorio.
-  constructor({ repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj = () => /* @__PURE__ */ new Date(), fuenteOcupacion = null }) {
-    Object.assign(this, { repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj, fuenteOcupacion });
+  // sesionesPago (opcional): pasarelas con página de pago propia (Stripe Checkout, Sprint 7).
+  constructor({ repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj = () => /* @__PURE__ */ new Date(), fuenteOcupacion = null, sesionesPago = null }) {
+    Object.assign(this, { repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj, fuenteOcupacion, sesionesPago });
   }
   // Cuántos arranques hay ya agendados por día: { '2026-12-01': 2, ... }
   async ocupacion() {
@@ -361,6 +362,37 @@ var ServicioPedidos = class {
   }
   // Compra completa: crea la orden, cobra, y la agenda (servicio) o la entrega (digital).
   async comprar({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, tarjeta, fechaCliente, ordenId }) {
+    const { orden: guardada, cot, ocupacion } = await this.#prepararOrden({ ids, cliente, fechaCliente, ordenId });
+    let orden = guardada;
+    const cobro = await this.fabricaPasarelas.crearPasarela(pasarela).cobrar({
+      monto: orden.totalHoy,
+      moneda: orden.moneda,
+      referencia: orden.id,
+      tarjeta
+    });
+    if (!cobro.ok) {
+      this.bus.publicar(EVENTOS.PAGO_RECHAZADO, { orden, mensaje: cobro.mensaje });
+      return { ok: false, orden, mensaje: cobro.mensaje };
+    }
+    const pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy };
+    orden = await this.#aplicarPago(orden, pago, fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion);
+    return { ok: true, orden };
+  }
+  // ¿Esta pasarela cobra en su propia página (Stripe Checkout) en lugar de con el SDK simulado?
+  usaPaginaDePago(pasarela) {
+    return Boolean(this.sesionesPago?.soporta(pasarela));
+  }
+  // Pago en la página de la pasarela: deja la orden cotizada y devuelve la URL a donde
+  // mandar al cliente. Aquí no se cobra ni se marca nada como pagado: eso lo hace el
+  // webhook firmado de la pasarela (confirmarPago), aunque el cliente cierre la pestaña.
+  async iniciarPagoEnPasarela({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, fechaCliente, ordenId, origen }) {
+    if (!this.usaPaginaDePago(pasarela)) throw new Error(`La pasarela ${pasarela} no tiene p\xE1gina de pago conectada`);
+    const { orden } = await this.#prepararOrden({ ids, cliente, fechaCliente, ordenId });
+    const { url } = await this.sesionesPago.crear({ ordenId: orden.id, pasarela, origen });
+    return { orden, url };
+  }
+  // Crea (o reutiliza, tras un rechazo o una cancelación) la orden cotizada y la guarda.
+  async #prepararOrden({ ids, cliente, fechaCliente, ordenId }) {
     const ocupacion = await this.ocupacion();
     const cot = this.cotizar(ids, ocupacion);
     if (cot.partidas.length === 0) throw new Error("La cotizaci\xF3n est\xE1 vac\xEDa");
@@ -377,13 +409,13 @@ var ServicioPedidos = class {
     orden = {
       ...orden,
       cliente,
-      partidas: cot.partidas.map(({ producto, cobro: cobro2 }) => ({
+      partidas: cot.partidas.map(({ producto, cobro }) => ({
         id: producto.id,
         nombre: producto.nombre,
         tipo: producto.tipo,
         precio: producto.precio,
-        cobroHoy: cobro2.hoy,
-        totalContrato: cobro2.totalContrato
+        cobroHoy: cobro.hoy,
+        totalContrato: cobro.totalContrato
       })),
       totalHoy: cot.totalHoy,
       totalContrato: cot.totalContrato,
@@ -394,19 +426,7 @@ var ServicioPedidos = class {
     };
     orden = await this.repoPedidos.guardar(orden);
     if (nueva) this.bus.publicar(EVENTOS.COTIZADA, orden);
-    const cobro = await this.fabricaPasarelas.crearPasarela(pasarela).cobrar({
-      monto: orden.totalHoy,
-      moneda: orden.moneda,
-      referencia: orden.id,
-      tarjeta
-    });
-    if (!cobro.ok) {
-      this.bus.publicar(EVENTOS.PAGO_RECHAZADO, { orden, mensaje: cobro.mensaje });
-      return { ok: false, orden, mensaje: cobro.mensaje };
-    }
-    const pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy };
-    orden = await this.#aplicarPago(orden, pago, fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion);
-    return { ok: true, orden };
+    return { orden, cot, ocupacion };
   }
   // Pago confirmado por la pasarela desde su servidor (webhook), no por el navegador.
   // Es idempotente: si la orden ya no está cotizada, el pago ya se había aplicado y no cambia nada.
@@ -758,6 +778,71 @@ async function aplicar(evento, servicio, consultores) {
   });
 }
 
+// src/core/pagos/checkoutStripe.js
+var API_STRIPE = "https://api.stripe.com/v1";
+var ErrorPago = class extends Error {
+  constructor(motivo, status) {
+    super(motivo);
+    this.motivo = motivo;
+    this.status = status;
+  }
+};
+var aCentavos = (pesos) => Math.round(Number(pesos) * 100);
+function origenPermitido(origen, permitidos) {
+  return typeof origen === "string" && permitidos.map((p) => p.trim().replace(/\/$/, "")).includes(origen.replace(/\/$/, ""));
+}
+function parametrosSesion(orden, origen) {
+  const p = new URLSearchParams({
+    mode: "payment",
+    "line_items[0][quantity]": "1",
+    "line_items[0][price_data][currency]": String(orden.moneda ?? "MXN").toLowerCase(),
+    "line_items[0][price_data][unit_amount]": String(aCentavos(orden.totalHoy)),
+    "line_items[0][price_data][product_data][name]": `Socius \xB7 Orden ${orden.id}`,
+    "line_items[0][price_data][product_data][description]": (orden.partidas ?? []).map((x) => x.nombre).join(", ").slice(0, 500) || "Programas Socius",
+    client_reference_id: orden.id,
+    "metadata[orden_id]": orden.id,
+    "payment_intent_data[metadata][orden_id]": orden.id,
+    success_url: `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`,
+    cancel_url: `${origen}/checkout?cancelado=${encodeURIComponent(orden.id)}`,
+    locale: "es-419"
+  });
+  if (orden.cliente?.email) p.set("customer_email", orden.cliente.email);
+  return p;
+}
+async function crearSesionCheckout({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
+  const cuerpo = parametrosSesion(orden, origen);
+  const r = await fetch(`${API_STRIPE}/checkout/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${llaveSecreta}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      // Idempotencia (Tema 3): si el navegador repite la petición, Stripe devuelve la
+      // misma sesión en lugar de crear otra. Cambia si cambia el monto o el sitio.
+      "Idempotency-Key": `checkout-${orden.id}-${aCentavos(orden.totalHoy)}-${origen}`
+    },
+    body: cuerpo.toString()
+  });
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok || !datos.url) throw new ErrorPago(datos?.error?.message ?? "stripe_sin_respuesta", 502);
+  return { id: datos.id, url: datos.url };
+}
+async function crearPago({ ordenId, origen, repo, llaveSecreta, origenesPermitidos, fetch }) {
+  try {
+    if (!llaveSecreta) throw new ErrorPago("sin_llave_stripe", 500);
+    if (!origenPermitido(origen, origenesPermitidos)) throw new ErrorPago("origen_no_permitido", 400);
+    if (!ordenId) throw new ErrorPago("sin_orden", 400);
+    const orden = await repo.obtener(ordenId);
+    if (!orden) throw new ErrorPago("orden_no_encontrada", 404);
+    if (orden.estado !== "cotizada") throw new ErrorPago("orden_ya_pagada", 409);
+    if (!(orden.totalHoy > 0)) throw new ErrorPago("monto_invalido", 400);
+    const sesion = await crearSesionCheckout({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, fetch });
+    return { status: 200, cuerpo: sesion };
+  } catch (e) {
+    if (e instanceof ErrorPago) return { status: e.status, cuerpo: { error: e.motivo } };
+    return { status: 500, cuerpo: { error: e.message } };
+  }
+}
+
 // src/core/webhooks/servidor.js
 function crearServicioServidor(cliente) {
   const repo = new RepositorioPedidosSupabase(cliente);
@@ -772,6 +857,8 @@ function crearServicioServidor(cliente) {
 }
 export {
   ColaEventosSupabase,
+  RepositorioPedidosSupabase,
+  crearPago,
   crearServicioServidor,
   procesarPendientes,
   recibirWebhook

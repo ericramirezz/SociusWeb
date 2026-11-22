@@ -6,6 +6,7 @@ import { AgendaLlamadas } from './agendaLlamadas'
 import { ConfigApp } from './config'
 import { BusEventos, EVENTOS } from './eventos'
 import { FabricaPasarelas } from './pagos/fabricaPasarelas'
+import { SesionesPagoSupabase } from './pagos/sesionesPago'
 import { RepositorioLocalStorage } from './repositorio'
 import { RepositorioLlamadasSupabase, RepositorioPedidosSupabase } from './repositorioSupabase'
 import { ServicioPedidos } from './servicioPedidos'
@@ -21,6 +22,12 @@ const repoLlamadas = supabase ? new RepositorioLlamadasSupabase(supabase) : new 
 
 export const usaSupabase = Boolean(supabase)
 
+// Sprint 7: con Supabase y la llave publicable de Stripe en .env.local, Stripe cobra en
+// su propia página (Edge Function crear-pago). Mercado Pago y PayPal siguen simulados.
+// La llave publicable no se usa para cobrar (la página la arma el servidor); su
+// presencia indica que el equipo ya conectó la cuenta de prueba de Stripe.
+const stripeConectado = Boolean(supabase && import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+
 export const pedidos = new ServicioPedidos({
   repoPedidos,
   fabricaPasarelas,
@@ -28,6 +35,7 @@ export const pedidos = new ServicioPedidos({
   config,
   catalogo: programas,
   fuenteOcupacion: supabase ? (desde) => repoPedidos.arranquesPorDia(desde) : null,
+  sesionesPago: stripeConectado ? new SesionesPagoSupabase(supabase, ['stripe']) : null,
 })
 
 export const sesion = new ServicioSesion({ cliente: supabase })

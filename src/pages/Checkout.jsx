@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { CreditCard, Lock, ArrowRight, AlertCircle, Calendar, CheckCircle, Zap, LogIn } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { CreditCard, Lock, ArrowRight, AlertCircle, Calendar, CheckCircle, Zap, LogIn, ExternalLink } from 'lucide-react'
 import {
   pedidos, seleccion, fabricaPasarelas, config, formatoMoneda,
   TARJETA_APROBADA, TARJETA_RECHAZADA,
@@ -20,6 +20,7 @@ const tarjetaConEspacios = (n) => n.replace(/(\d{4})(?=\d)/g, '$1 ')
 
 export default function Checkout() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { t, fecha, cobro: detalleCobro } = useIdioma()
   const [seleccionados, setSeleccionados] = useState(() => seleccion.leer())
   const [form, setForm] = useState({ nombre: '', empresa: '', email: '', telefono: '' })
@@ -27,14 +28,18 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false)
   const [pasarela, setPasarela] = useState(config.pasarelaPorDefecto)
   const [tarjeta, setTarjeta] = useState(TARJETA_APROBADA)
-  const [ordenId, setOrdenId] = useState(null) // si el pago se rechaza, se reintenta sobre la misma orden
-  const [errorPago, setErrorPago] = useState('')
+  // Si el pago se rechaza, o el cliente regresa de Stripe sin pagar, se reintenta sobre la misma orden.
+  const [ordenId, setOrdenId] = useState(() => params.get('cancelado'))
+  const [errorPago, setErrorPago] = useState(() => (params.get('cancelado') ? t('checkout.cancelado') : ''))
   const [fechaPreferida, setFechaPreferida] = useState('') // vacía = la que propone el sistema
   const [ocupacion, setOcupacion] = useState(null) // arranques por día; null mientras carga
 
   // Con Supabase activo, comprar requiere sesión (la base liga la orden a la cuenta).
   const { usuario, disponible: hayCuentas, cargando: cargandoSesion } = useSesion()
   const faltaSesion = hayCuentas && !cargandoSesion && !usuario
+
+  // Sprint 7: Stripe cobra en su propia página; las demás pasarelas siguen simuladas.
+  const paginaExterna = pedidos.usaPaginaDePago(pasarela)
 
   // La fachada cotiza y propone la fecha de entrega según el tipo de producto y el cupo diario.
   const cotizacion = pedidos.cotizar(seleccionados, ocupacion ?? {})
@@ -66,7 +71,7 @@ export default function Checkout() {
     if (!form.empresa.trim()) e.empresa = t('checkout.empresaRequerida')
     if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = t('comun.emailValido')
     if (!form.telefono.trim()) e.telefono = t('checkout.telefonoRequerido')
-    if (tarjeta.length !== 16) e.tarjeta = t('checkout.tarjeta16')
+    if (!paginaExterna && tarjeta.length !== 16) e.tarjeta = t('checkout.tarjeta16')
     return e
   }
 
@@ -83,6 +88,17 @@ export default function Checkout() {
     setLoading(true)
     setErrorPago('')
     try {
+      if (paginaExterna) {
+        // La orden queda cotizada y el cliente paga en Stripe; el webhook la confirma.
+        const r = await pedidos.iniciarPagoEnPasarela({
+          ids: seleccionados, cliente: form, pasarela, ordenId,
+          fechaCliente: revision?.fecha, origen: window.location.origin,
+        })
+        setOrdenId(r.orden.id)
+        localStorage.setItem('socius_ultima_orden', r.orden.id)
+        window.location.assign(r.url)
+        return
+      }
       const r = await pedidos.comprar({
         ids: seleccionados, cliente: form, pasarela, tarjeta, ordenId,
         fechaCliente: revision?.fecha,
@@ -211,7 +227,7 @@ export default function Checkout() {
                 </h2>
                 <p className="mb-5 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <AlertCircle size={13} className="flex-shrink-0" />
-                  {t('checkout.modoPrueba')}
+                  {paginaExterna ? t('checkout.modoPruebaStripe') : t('checkout.modoPrueba')}
                 </p>
 
                 <p className={labelClass}>{t('checkout.pagarCon')}</p>
@@ -232,22 +248,36 @@ export default function Checkout() {
                   ))}
                 </div>
 
-                <label htmlFor="tarjeta" className={labelClass}>{t('checkout.numeroTarjeta')}</label>
-                <input
-                  id="tarjeta"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={tarjetaConEspacios(tarjeta)}
-                  onChange={(e) => setTarjeta(e.target.value.replace(/\D/g, '').slice(0, 16))}
-                  className={`${inputClass('tarjeta')} font-mono`}
-                />
-                {errors.tarjeta && <p className="text-red-600 text-xs mt-1">{errors.tarjeta}</p>}
-                <p className="text-slate-500 text-xs mt-2">
-                  {t('checkout.tarjetasPrueba')}{' '}
-                  <button type="button" onClick={() => setTarjeta(TARJETA_APROBADA)} className="text-brand font-medium underline">{t('checkout.aprobada')}</button>
-                  {' · '}
-                  <button type="button" onClick={() => setTarjeta(TARJETA_RECHAZADA)} className="text-brand font-medium underline">{t('checkout.rechazada')}</button>
-                </p>
+                {paginaExterna ? (
+                  <div className="p-4 rounded-lg bg-brand-soft border border-brand/15 text-sm text-slate-700">
+                    <p className="flex items-center gap-2 text-navy font-semibold mb-1">
+                      <ExternalLink size={14} className="text-brand" />
+                      {t('checkout.paginaStripe')}
+                    </p>
+                    <p className="text-slate-600 text-xs">
+                      {t('checkout.tarjetaStripe')} <span className="font-mono">4242 4242 4242 4242</span> · {t('checkout.tarjetaStripeDatos')}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <label htmlFor="tarjeta" className={labelClass}>{t('checkout.numeroTarjeta')}</label>
+                    <input
+                      id="tarjeta"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={tarjetaConEspacios(tarjeta)}
+                      onChange={(e) => setTarjeta(e.target.value.replace(/\D/g, '').slice(0, 16))}
+                      className={`${inputClass('tarjeta')} font-mono`}
+                    />
+                    {errors.tarjeta && <p className="text-red-600 text-xs mt-1">{errors.tarjeta}</p>}
+                    <p className="text-slate-500 text-xs mt-2">
+                      {t('checkout.tarjetasPrueba')}{' '}
+                      <button type="button" onClick={() => setTarjeta(TARJETA_APROBADA)} className="text-brand font-medium underline">{t('checkout.aprobada')}</button>
+                      {' · '}
+                      <button type="button" onClick={() => setTarjeta(TARJETA_RECHAZADA)} className="text-brand font-medium underline">{t('checkout.rechazada')}</button>
+                    </p>
+                  </>
+                )}
 
                 {errorPago && (
                   <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2" role="alert">
@@ -270,7 +300,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock size={16} />
-                    {t('checkout.pagar')} {formatoMoneda(cotizacion.totalHoy)} MXN
+                    {paginaExterna ? t('checkout.pagarEnStripe') : t('checkout.pagar')} {formatoMoneda(cotizacion.totalHoy)} MXN
                     <ArrowRight size={16} />
                   </>
                 )}

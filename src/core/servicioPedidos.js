@@ -21,8 +21,9 @@ export class ServicioPedidos {
   // fuenteOcupacion (opcional): async (desdeISO) => { 'YYYY-MM-DD': arranques }.
   // Con Supabase la da la base (el cliente no ve las órdenes de otros);
   // sin ella se cuenta sobre las órdenes del repositorio.
-  constructor({ repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj = () => new Date(), fuenteOcupacion = null }) {
-    Object.assign(this, { repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj, fuenteOcupacion })
+  // sesionesPago (opcional): pasarelas con página de pago propia (Stripe Checkout, Sprint 7).
+  constructor({ repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj = () => new Date(), fuenteOcupacion = null, sesionesPago = null }) {
+    Object.assign(this, { repoPedidos, fabricaPasarelas, bus, config, catalogo, reloj, fuenteOcupacion, sesionesPago })
   }
 
   // Cuántos arranques hay ya agendados por día: { '2026-12-01': 2, ... }
@@ -62,6 +63,39 @@ export class ServicioPedidos {
 
   // Compra completa: crea la orden, cobra, y la agenda (servicio) o la entrega (digital).
   async comprar({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, tarjeta, fechaCliente, ordenId }) {
+    const { orden: guardada, cot, ocupacion } = await this.#prepararOrden({ ids, cliente, fechaCliente, ordenId })
+    let orden = guardada
+
+    const cobro = await this.fabricaPasarelas.crearPasarela(pasarela).cobrar({
+      monto: orden.totalHoy, moneda: orden.moneda, referencia: orden.id, tarjeta,
+    })
+    if (!cobro.ok) {
+      this.bus.publicar(EVENTOS.PAGO_RECHAZADO, { orden, mensaje: cobro.mensaje })
+      return { ok: false, orden, mensaje: cobro.mensaje }
+    }
+
+    const pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy }
+    orden = await this.#aplicarPago(orden, pago, fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion)
+    return { ok: true, orden }
+  }
+
+  // ¿Esta pasarela cobra en su propia página (Stripe Checkout) en lugar de con el SDK simulado?
+  usaPaginaDePago(pasarela) {
+    return Boolean(this.sesionesPago?.soporta(pasarela))
+  }
+
+  // Pago en la página de la pasarela: deja la orden cotizada y devuelve la URL a donde
+  // mandar al cliente. Aquí no se cobra ni se marca nada como pagado: eso lo hace el
+  // webhook firmado de la pasarela (confirmarPago), aunque el cliente cierre la pestaña.
+  async iniciarPagoEnPasarela({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, fechaCliente, ordenId, origen }) {
+    if (!this.usaPaginaDePago(pasarela)) throw new Error(`La pasarela ${pasarela} no tiene página de pago conectada`)
+    const { orden } = await this.#prepararOrden({ ids, cliente, fechaCliente, ordenId })
+    const { url } = await this.sesionesPago.crear({ ordenId: orden.id, pasarela, origen })
+    return { orden, url }
+  }
+
+  // Crea (o reutiliza, tras un rechazo o una cancelación) la orden cotizada y la guarda.
+  async #prepararOrden({ ids, cliente, fechaCliente, ordenId }) {
     const ocupacion = await this.ocupacion()
     const cot = this.cotizar(ids, ocupacion)
     if (cot.partidas.length === 0) throw new Error('La cotización está vacía')
@@ -94,18 +128,7 @@ export class ServicioPedidos {
     // El repositorio asigna el número de orden (SOC-100001…) la primera vez.
     orden = await this.repoPedidos.guardar(orden)
     if (nueva) this.bus.publicar(EVENTOS.COTIZADA, orden)
-
-    const cobro = await this.fabricaPasarelas.crearPasarela(pasarela).cobrar({
-      monto: orden.totalHoy, moneda: orden.moneda, referencia: orden.id, tarjeta,
-    })
-    if (!cobro.ok) {
-      this.bus.publicar(EVENTOS.PAGO_RECHAZADO, { orden, mensaje: cobro.mensaje })
-      return { ok: false, orden, mensaje: cobro.mensaje }
-    }
-
-    const pago = { pasarela: cobro.pasarela, idTransaccion: cobro.idTransaccion, monto: orden.totalHoy }
-    orden = await this.#aplicarPago(orden, pago, fechaCliente ?? cot.entregaPropuesta.fechaArranque, ocupacion)
-    return { ok: true, orden }
+    return { orden, cot, ocupacion }
   }
 
   // Pago confirmado por la pasarela desde su servidor (webhook), no por el navegador.

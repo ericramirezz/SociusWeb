@@ -7,7 +7,7 @@ Aplicación web para Socius Real Estate Consulting: catálogo con precios, cotiz
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 43 casos de prueba (Vitest)
+npm test           # 47 casos de prueba (Vitest)
 npm run build      # versión de producción en dist/
 npm run build:funciones   # empaqueta src/core para las Edge Functions (supabase/functions/_shared/)
 npm run simular:webhook -- --url … --secreto … --orden SOC-… --monto …   # manda un aviso de pago firmado
@@ -19,9 +19,9 @@ npm run simular:webhook -- --url … --secreto … --orden SOC-… --monto …  
 - Backend: Supabase (Postgres + autenticación). Con `.env.local` los pedidos, pagos y llamadas viven en la base y el cliente entra con un enlace a su correo; sin él, la app usa `localStorage` y no pide cuenta (así corren las pruebas).
 - Base de datos: `supabase/migrations/` se pega en orden en el SQL Editor de Supabase (001, 002…). Seguridad por fila: cada cliente ve solo sus pedidos.
 - `.env.local` (no se sube a git): `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`. Nunca la llave secreta.
-- Pagos **simulados** (Stripe, Mercado Pago y PayPal detrás de adaptadores). La integración real se hace en la fase de pruebas y requiere un backend: las llaves secretas nunca van en el frontend.
+- Pagos: **Stripe en modo prueba real** (Stripe Checkout, Sprint 7) cuando `.env.local` trae `VITE_STRIPE_PUBLISHABLE_KEY`; Mercado Pago y PayPal siguen **simulados** detrás de adaptadores. Las llaves secretas viven solo en Supabase (Edge Functions), nunca en el frontend.
 - Webhooks de pago firmados (Función 2): la pasarela avisa a la Edge Function `webhook-pagos`, que revisa la firma HMAC, guarda el aviso en la cola `eventos_pago` y responde; el consumidor lo aplica a la orden con reintentos (ver "Webhooks" abajo).
-- Tarjetas de prueba: `4242 4242 4242 4242` aprueba, `4000 0000 0000 0002` rechaza.
+- Tarjetas de prueba: `4242 4242 4242 4242` aprueba, `4000 0000 0000 0002` rechaza (en la página de Stripe y en el simulador).
 
 ## Estructura
 
@@ -48,11 +48,13 @@ src/
       procesador.js         Consumidor: aplica el pago a la orden, reintenta 3 veces
       servidor.js           Lo que usan las Edge Functions (se empaqueta)
     pagos/
+      checkoutStripe.js     Sprint 7: sesión de Stripe Checkout (corre en la Edge Function crear-pago)
+      sesionesPago.js       Sprint 7: el navegador pide la página de pago a crear-pago
       sdkSimulados.js       Imitan la forma de respuesta de cada proveedor
       adaptadores.js        Adapter: un contrato cobrar()/reembolsar() para los tres
       decoradores.js        Decorator: bitácora, idempotencia, reintento
       fabricaPasarelas.js   Factory Method con registro
-    __tests__/          Pruebas unitarias (CP-01 a CP-22) y de webhooks (CP-37 a CP-41)
+    __tests__/          Pruebas unitarias (CP-01 a CP-22), webhooks (CP-37 a CP-41) y Stripe (CP-42 a CP-45)
   __tests__/            Pruebas de interfaz e integración con Supabase falso (CP-23 a CP-36)
   sesion/               SesionContext (useSesion): usuario actual para las pantallas
   i18n/                 Idiomas: IdiomaContext (useIdioma, t), es.js, en.js
@@ -64,7 +66,7 @@ src/
 public/testimonios/     Fotos y videos de los testimonios
 supabase/
   migrations/           SQL que se corre en orden en el SQL Editor (001, 002, 003…)
-  functions/            Edge Functions: webhook-pagos y procesar-eventos
+  functions/            Edge Functions: webhook-pagos, procesar-eventos y crear-pago
     _shared/webhooks.js Generado por `npm run build:funciones`; no editar a mano
 scripts/                construir-funciones.mjs, simular-webhook.mjs
 ```
@@ -102,6 +104,26 @@ npm run simular:webhook -- --url https://wfhwrblshkdbrkskfmrt.supabase.co/functi
 ```
 
 Debe responder `recibido` y luego `duplicado`; en `eventos_pago` queda un solo aviso `procesado` (`intentos` cuenta solo los fallos) y la orden pasa a *pagada* o *agendada*. Sin firma, `webhook-pagos` responde 400; sin llave, `procesar-eventos` responde 401.
+
+## Pago con Stripe (Sprint 7)
+
+1. En el checkout el cliente elige Stripe y da clic en "Pagar en Stripe". `ServicioPedidos.iniciarPagoEnPasarela` deja la orden **cotizada** (no cobra nada).
+2. La Edge Function `crear-pago` revisa la sesión del cliente, lee la orden con sus permisos (solo ve las suyas), toma el monto **de la base** y crea la sesión de Stripe Checkout con la llave secreta. El número de orden viaja en `payment_intent_data.metadata.orden_id`.
+3. El cliente paga en la página de Stripe; la tarjeta nunca pasa por nuestro código.
+4. Stripe manda `payment_intent.succeeded` firmado a `webhook-pagos` (Función 2) y la orden pasa a pagada → agendada/completada.
+5. Stripe regresa al cliente a `/confirmacion?orden=…`, que espera al webhook (consulta cada 2 s, hasta 1 minuto). Si cancela, vuelve a `/checkout?cancelado=…` y reintenta sobre la misma orden.
+
+Configuración (una vez):
+
+```bash
+read -rsp "sk_test_: " SK && echo && npx supabase secrets set STRIPE_SECRET_KEY=$SK
+npm run build:funciones
+npx supabase functions deploy crear-pago --no-verify-jwt --use-api   # la sesión se revisa dentro con getUser()
+```
+
+- `.env.local`: `VITE_STRIPE_PUBLISHABLE_KEY=pk_test_…` (activa el modo Stripe real en la app).
+- Stripe → Desarrolladores → Webhooks: destino `https://<ref>.supabase.co/functions/v1/webhook-pagos/stripe` con los eventos `payment_intent.succeeded` y `payment_intent.payment_failed`; su secreto `whsec_…` va en `STRIPE_WEBHOOK_SECRET` (reemplaza el de prueba del simulador).
+- Sitio publicado: agregar su dirección a `ORIGENES_PERMITIDOS` (secreto, separado por comas; por defecto `http://localhost:5173`).
 
 ## Idiomas
 
@@ -158,6 +180,7 @@ Blanco y azules. Tokens en `tailwind.config.js`: `brand` (#1D4ED8), `brand-dark`
 
 ## Pendiente
 
-1. Integración real en modo prueba de Stripe, Mercado Pago y PayPal: cobrar desde Edge Functions, consultar el pago de Mercado Pago, verificar avisos de PayPal y quitar las políticas TEMPORAL de la migración 001.
-2. Correo propio (SMTP) para el enlace de acceso antes de la demo.
-3. Documento final, presentación con mockup, diagrama de contexto y demo.
+1. Integración real en modo prueba de Mercado Pago y PayPal (Stripe ya está): consultar el pago de Mercado Pago, verificar avisos de PayPal y, con las tres reales, quitar las políticas TEMPORAL de la migración 001.
+2. Reembolsos reales de Stripe: hoy cancelar/devolver usa el adaptador simulado.
+3. Correo propio (SMTP) para el enlace de acceso antes de la demo.
+4. Documento final, presentación con mockup, diagrama de contexto y demo.

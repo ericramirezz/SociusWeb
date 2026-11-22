@@ -1,31 +1,72 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { CheckCircle, Calendar, Hash, Package, ArrowRight } from 'lucide-react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { CheckCircle, Calendar, Hash, Package, ArrowRight, Clock } from 'lucide-react'
 import EstadoBadge from '../components/EstadoBadge'
-import { pedidos, formatoMoneda } from '../core'
+import { pedidos, seleccion, formatoMoneda, ESTADOS } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+
+// Al volver de la página de Stripe, el pago lo confirma el webhook unos segundos después:
+// mientras la orden siga cotizada se vuelve a consultar cada 2 s, hasta 1 minuto.
+const ESPERA_MS = 2000
+const MAX_CONSULTAS = 30
 
 export default function Confirmacion() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
   const { t, fecha, locale, cobro: detalleCobro } = useIdioma()
   const [orden, setOrden] = useState(null)
+  const [agotado, setAgotado] = useState(false)
+  const id = params.get('orden') ?? localStorage.getItem('socius_ultima_orden')
 
   useEffect(() => {
     let vigente = true
-    pedidos
-      .obtener(localStorage.getItem('socius_ultima_orden'))
-      .then((encontrada) => {
+    let temporizador
+    const consultar = async (intento) => {
+      try {
+        const encontrada = await pedidos.obtener(id)
         if (!vigente) return
-        if (encontrada) setOrden(encontrada)
-        else navigate('/')
-      })
-      .catch(() => vigente && navigate('/'))
+        if (!encontrada) return navigate('/')
+        setOrden(encontrada)
+        if (encontrada.estado !== ESTADOS.COTIZADA) return seleccion.vaciar()
+        if (intento >= MAX_CONSULTAS) return setAgotado(true)
+        temporizador = setTimeout(() => consultar(intento + 1), ESPERA_MS)
+      } catch {
+        if (vigente) navigate('/')
+      }
+    }
+    consultar(1)
     return () => {
       vigente = false
+      clearTimeout(temporizador)
     }
-  }, [navigate])
+  }, [id, navigate])
 
   if (!orden) return null
+
+  // Todavía sin confirmar: el cliente acaba de pagar en Stripe y el webhook no ha llegado.
+  if (orden.estado === ESTADOS.COTIZADA) {
+    return (
+      <div className="min-h-screen bg-white pt-24 pb-20 px-4 flex items-center">
+        <div className="max-w-md mx-auto w-full text-center">
+          {agotado ? (
+            <Clock size={40} className="mx-auto text-brand mb-5" />
+          ) : (
+            <div className="mx-auto mb-5 w-10 h-10 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
+          )}
+          <h1 className="text-3xl font-black text-navy mb-3">{agotado ? t('confirmacion.tardando') : t('confirmacion.confirmando')}</h1>
+          <p className="text-slate-600 mb-2">{agotado ? t('confirmacion.tardandoTexto') : t('confirmacion.confirmandoTexto')}</p>
+          <p className="text-brand font-bold tracking-wider mb-8">{orden.id}</p>
+          <Link
+            to="/pedidos"
+            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors"
+          >
+            {t('confirmacion.verPedidos')}
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
 
   const fechaOrdenFormateada = new Date(orden.fechaOrden).toLocaleDateString(locale, {
@@ -42,7 +83,7 @@ export default function Confirmacion() {
           </div>
           <h1 className="text-4xl font-black text-navy mb-3">{t('confirmacion.titulo')}</h1>
           <p className="text-slate-600 text-lg">
-            {t('confirmacion.procesado', { pasarela: orden.pago.pasarela })}
+            {t('confirmacion.procesado', { pasarela: orden.pago?.pasarela ?? '' })}
           </p>
         </div>
 

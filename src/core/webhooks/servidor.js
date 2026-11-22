@@ -1,4 +1,5 @@
-// Todo lo que necesitan las Edge Functions de supabase/functions/.
+// Todo lo que necesitan las Edge Functions de supabase/functions/
+// (webhook-pagos, procesar-eventos y crear-pago).
 // `npm run build:funciones` empaqueta este archivo (y lo que importa) en
 // supabase/functions/_shared/webhooks.js, porque Supabase solo publica lo que
 // está dentro de supabase/functions.
@@ -11,6 +12,8 @@ import { programas } from '../../data/programas'
 export { recibirWebhook } from './receptor'
 export { procesarPendientes } from './procesador'
 export { ColaEventosSupabase } from './colaEventos'
+export { crearPago } from '../pagos/checkoutStripe'
+export { RepositorioPedidosSupabase }
 
 // El mismo ServicioPedidos de la app, pero con el cliente de Supabase del servidor
 // (llave de servicio). No cobra nada: solo aplica pagos ya confirmados.
