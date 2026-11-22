@@ -13,7 +13,7 @@ import { calendarioServicio, resolverFechaCliente } from './entrega'
 import { ESTADOS, puede, transicionar } from './estadoOrden'
 import { EVENTOS } from './eventos'
 import { aISO, deISO } from './fechas'
-import { esPagoStripeReal } from './pagos/checkoutStripe'
+import { esPagoReal } from './pagos/paginasDePago'
 import { crearProducto } from './productos'
 
 const ACTIVAS = [ESTADOS.AGENDADA, ESTADOS.EN_CURSO]
@@ -170,7 +170,7 @@ export class ServicioPedidos {
   }
 
   // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa;
-  // si lo cobró Stripe de verdad, se deja la solicitud para Socius (ver reembolsoManual).
+  // si lo cobró la pasarela de verdad, se deja la solicitud para Socius (ver reembolsoManual).
   async cancelar(id) {
     let orden = await this.#obtener(id)
     orden = transicionar(orden, 'cancelar', this.reloj())
@@ -195,10 +195,10 @@ export class ServicioPedidos {
     return conSolicitud
   }
 
-  // Opción B del Sprint 7: un pago real de Stripe no lo reembolsa la app. El cliente deja
-  // la solicitud, Socius decide y reembolsa desde el panel de Stripe, y el webhook
-  // charge.refunded marca la orden como reembolsada (registrarReembolso).
-  reembolsoManual = (orden) => esPagoStripeReal(orden.pago)
+  // Opción B del Sprint 7: un pago real (Stripe o Mercado Pago) no lo reembolsa la app.
+  // El cliente deja la solicitud, Socius decide y reembolsa desde el panel de la pasarela,
+  // y su webhook marca la orden como reembolsada (registrarReembolso).
+  reembolsoManual = (orden) => esPagoReal(orden.pago)
 
   #solicitud(tipo, orden) {
     return { estado: ESTADO_REEMBOLSO.SOLICITADO, tipo, monto: orden.pago.monto, fecha: this.reloj().toISOString() }

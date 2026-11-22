@@ -12,7 +12,8 @@ import { programas } from '../../data/programas'
 export { recibirWebhook } from './receptor'
 export { procesarPendientes } from './procesador'
 export { ColaEventosSupabase } from './colaEventos'
-export { crearPago } from '../pagos/checkoutStripe'
+export { crearPago } from '../pagos/paginasDePago'
+export { consultarPagoMercadoPago } from '../pagos/checkoutMercadoPago'
 export { RepositorioPedidosSupabase }
 
 // El mismo ServicioPedidos de la app, pero con el cliente de Supabase del servidor

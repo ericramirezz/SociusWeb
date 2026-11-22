@@ -3,7 +3,11 @@
 // Se llama con la llave de servicio, a mano o con un cron de Supabase:
 //   POST https://<proyecto>.supabase.co/functions/v1/procesar-eventos
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { ColaEventosSupabase, crearServicioServidor, procesarPendientes } from '../_shared/webhooks.js'
+import { ColaEventosSupabase, consultarPagoMercadoPago, crearServicioServidor, procesarPendientes } from '../_shared/webhooks.js'
+
+const consultores = {
+  mercadopago: (idPago: string) => consultarPagoMercadoPago(idPago, { llaveSecreta: Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') }),
+}
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Método no permitido', { status: 405 })
@@ -13,6 +17,7 @@ Deno.serve(async (req) => {
   const resumen = await procesarPendientes({
     cola: new ColaEventosSupabase(cliente),
     servicio: crearServicioServidor(cliente),
+    consultores,
   })
   return Response.json(resumen)
 })

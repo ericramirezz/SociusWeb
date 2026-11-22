@@ -7,7 +7,7 @@ Aplicación web para Socius Real Estate Consulting: catálogo con precios, cotiz
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 49 casos de prueba (Vitest)
+npm test           # 51 casos de prueba (Vitest)
 npm run build      # versión de producción en dist/
 npm run build:funciones   # empaqueta src/core para las Edge Functions (supabase/functions/_shared/)
 npm run simular:webhook -- --url … --secreto … --orden SOC-… --monto …   # manda un aviso de pago firmado
@@ -19,7 +19,7 @@ npm run simular:webhook -- --url … --secreto … --orden SOC-… --monto …  
 - Backend: Supabase (Postgres + autenticación). Con `.env.local` los pedidos, pagos y llamadas viven en la base y el cliente entra con un enlace a su correo; sin él, la app usa `localStorage` y no pide cuenta (así corren las pruebas).
 - Base de datos: `supabase/migrations/` se pega en orden en el SQL Editor de Supabase (001, 002…). Seguridad por fila: cada cliente ve solo sus pedidos.
 - `.env.local` (no se sube a git): `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`. Nunca la llave secreta.
-- Pagos: **Stripe en modo prueba real** (Stripe Checkout, Sprint 7) cuando `.env.local` trae `VITE_STRIPE_PUBLISHABLE_KEY`; Mercado Pago y PayPal siguen **simulados** detrás de adaptadores. Las llaves secretas viven solo en Supabase (Edge Functions), nunca en el frontend.
+- Pagos: **Stripe y Mercado Pago en modo prueba real** (Stripe Checkout y Checkout Pro, Sprint 7) cuando `.env.local` trae `VITE_STRIPE_PUBLISHABLE_KEY` / `VITE_MERCADOPAGO_PUBLIC_KEY`; PayPal sigue **simulado** detrás de su adaptador. Las llaves secretas viven solo en Supabase (Edge Functions), nunca en el frontend.
 - Webhooks de pago firmados (Función 2): la pasarela avisa a la Edge Function `webhook-pagos`, que revisa la firma HMAC, guarda el aviso en la cola `eventos_pago` y responde; el consumidor lo aplica a la orden con reintentos (ver "Webhooks" abajo).
 - Tarjetas de prueba: `4242 4242 4242 4242` aprueba, `4000 0000 0000 0002` rechaza (en la página de Stripe y en el simulador).
 
@@ -48,13 +48,15 @@ src/
       procesador.js         Consumidor: aplica el pago a la orden, reintenta 3 veces
       servidor.js           Lo que usan las Edge Functions (se empaqueta)
     pagos/
+      paginasDePago.js      Sprint 7 (Strategy): reglas comunes de crear-pago y qué pago es real
       checkoutStripe.js     Sprint 7: sesión de Stripe Checkout (corre en la Edge Function crear-pago)
+      checkoutMercadoPago.js Sprint 7: preferencia de Checkout Pro y consulta del pago en su API
       sesionesPago.js       Sprint 7: el navegador pide la página de pago a crear-pago
       sdkSimulados.js       Imitan la forma de respuesta de cada proveedor
       adaptadores.js        Adapter: un contrato cobrar()/reembolsar() para los tres
       decoradores.js        Decorator: bitácora, idempotencia, reintento
       fabricaPasarelas.js   Factory Method con registro
-    __tests__/          Pruebas unitarias (CP-01 a CP-22), webhooks (CP-37 a CP-41) y Stripe (CP-42 a CP-47)
+    __tests__/          Pruebas unitarias (CP-01 a CP-22), webhooks (CP-37 a CP-41) Stripe (CP-42 a CP-47) y Mercado Pago (CP-48 y CP-49)
   __tests__/            Pruebas de interfaz e integración con Supabase falso (CP-23 a CP-36)
   sesion/               SesionContext (useSesion): usuario actual para las pantallas
   i18n/                 Idiomas: IdiomaContext (useIdioma, t), es.js, en.js
@@ -78,7 +80,7 @@ scripts/                construir-funciones.mjs, simular-webhook.mjs
 3. **Consumidor** (`procesador.js`): toma los pendientes con `tomar_eventos_pago` (`for update skip locked`, así dos procesos no toman el mismo) y llama a `ServicioPedidos.confirmarPago`, que usa la misma tabla de estados que el checkout. Si falla, reintenta; al tercer fallo el aviso queda en `error` con el motivo.
 4. Si la orden ya estaba pagada, no cambia nada (idempotencia). Si el monto no coincide con el de la orden, no se aplica.
 
-Mercado Pago solo avisa "cambió el pago X": el consumidor consulta su API para saber el estado (se conecta en el Sprint 7). PayPal verifica sus avisos por API; también en el Sprint 7.
+Mercado Pago solo avisa "cambió el pago X": el consumidor consulta `GET /v1/payments/{id}` con el Access Token para saber el estado, el monto y la orden (`external_reference`). PayPal verifica sus avisos por API; se conecta después.
 
 Secretos de las Edge Functions (Supabase → Edge Functions → Secrets): `STRIPE_WEBHOOK_SECRET`, `MERCADOPAGO_WEBHOOK_SECRET`. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` los pone Supabase solo.
 
@@ -125,15 +127,28 @@ npx supabase functions deploy crear-pago --no-verify-jwt --use-api   # la sesió
 - Stripe → Desarrolladores → Webhooks: destino `https://<ref>.supabase.co/functions/v1/webhook-pagos/stripe` con los eventos `payment_intent.succeeded` y `payment_intent.payment_failed`; su secreto `whsec_…` va en `STRIPE_WEBHOOK_SECRET` (reemplaza el de prueba del simulador).
 - Sitio publicado: agregar su dirección a `ORIGENES_PERMITIDOS` (secreto, separado por comas; por defecto `http://localhost:5173`).
 
-### Reembolsos de pagos reales de Stripe (solicitud + Socius)
+## Pago con Mercado Pago (Sprint 7)
 
-Un pago real de Stripe no lo reembolsa la app (`ServicioPedidos.reembolsoManual`):
+Mismo camino que Stripe, con la misma Edge Function `crear-pago` (`pasarela: 'mercadopago'`): crea una **preferencia** de Checkout Pro con el monto de la base y `external_reference = SOC-…`, y el cliente paga en la página de Mercado Pago. Al regresar (en localhost, con "Volver al sitio"), `/confirmacion` espera el aviso. El aviso firmado (`x-signature`) llega a `webhook-pagos/mercadopago` y el consumidor consulta el pago en la API antes de aplicarlo.
+
+Configuración (una vez): en developers de Mercado Pago, una aplicación de **Checkout Pro** en modo **Prueba**.
+
+- `MERCADOPAGO_ACCESS_TOKEN` (secreto de Supabase): el Access Token de las credenciales de prueba.
+- `.env.local`: `VITE_MERCADOPAGO_PUBLIC_KEY=APP_USR-…` (activa el modo Mercado Pago real en la app).
+- Configuración de webhooks (modo prueba): URL `https://<ref>.supabase.co/functions/v1/webhook-pagos/mercadopago`, evento **Pagos**; su clave secreta va en `MERCADOPAGO_WEBHOOK_SECRET`.
+- Tarjeta de prueba: `5474 9254 3267 0366`, titular **APRO** (aprueba), 11/30, CVV 123. Pagar en una ventana de incógnito: la cuenta vendedora no puede pagarse a sí misma.
+
+### Reembolsos de pagos reales (solicitud + Socius)
+
+Un pago real de Stripe o Mercado Pago no lo reembolsa la app (`ServicioPedidos.reembolsoManual`, que usa `esPagoReal`):
 
 1. El cliente cancela (antes del arranque: la orden queda *cancelada* y se libera la fecha) o pide devolución (en curso o completada). La orden guarda `reembolso = { estado: 'solicitado', tipo, monto }` y "Mis pedidos" lo muestra.
 2. Socius revisa la solicitud y, si procede, reembolsa desde el panel de Stripe (Pagos → el pago → Reembolsar), por el monto que decida.
 3. Stripe manda `charge.refunded` firmado a `webhook-pagos`; el consumidor encuentra la orden por el pago (`pi_…` en la tabla `pagos`) y la marca *reembolsada* con `reembolso.estado = 'emitido'`. Un reembolso hecho sin solicitud también se registra.
 
-Los pagos simulados (Mercado Pago, PayPal y los de Stripe del simulador) se siguen reembolsando solos. En Stripe, el webhook debe escuchar también `charge.refunded`.
+En Mercado Pago, Socius reembolsa desde su panel y llega un aviso del mismo pago; la API responde `status: refunded` y la orden se marca reembolsada.
+
+Los pagos simulados (PayPal y los del simulador) se siguen reembolsando solos. En Stripe, el webhook debe escuchar también `charge.refunded`.
 
 ## Idiomas
 
@@ -190,7 +205,7 @@ Blanco y azules. Tokens en `tailwind.config.js`: `brand` (#1D4ED8), `brand-dark`
 
 ## Pendiente
 
-1. Integración real en modo prueba de Mercado Pago y PayPal (Stripe ya está): consultar el pago de Mercado Pago, verificar avisos de PayPal y, con las tres reales, quitar las políticas TEMPORAL de la migración 001.
+1. Integración real en modo prueba de PayPal (Stripe y Mercado Pago ya están): verificar sus avisos por API y, con las tres reales, quitar las políticas TEMPORAL de la migración 001.
 2. Panel de Socius para ver las solicitudes de reembolso (función 7 del backlog); mientras, se revisan en Supabase (`ordenes.reembolso->>estado = 'solicitado'`).
 3. Correo propio (SMTP) para el enlace de acceso antes de la demo.
 4. Documento final, presentación con mockup, diagrama de contexto y demo.

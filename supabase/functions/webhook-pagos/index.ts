@@ -7,7 +7,12 @@
 // La lógica vive en src/core/webhooks/ (con pruebas CP-37 a CP-41) y llega aquí
 // empaquetada en ../_shared/webhooks.js con `npm run build:funciones`.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { ColaEventosSupabase, crearServicioServidor, procesarPendientes, recibirWebhook } from '../_shared/webhooks.js'
+import { ColaEventosSupabase, consultarPagoMercadoPago, crearServicioServidor, procesarPendientes, recibirWebhook } from '../_shared/webhooks.js'
+
+// Mercado Pago solo avisa "cambió el pago X": el consumidor le pregunta a su API.
+const consultores = {
+  mercadopago: (idPago: string) => consultarPagoMercadoPago(idPago, { llaveSecreta: Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') }),
+}
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Método no permitido', { status: 405 })
@@ -33,7 +38,7 @@ Deno.serve(async (req) => {
   // Se responde ya; el consumidor corre después en segundo plano.
   if (r.status === 200) {
     EdgeRuntime.waitUntil(
-      procesarPendientes({ cola, servicio: crearServicioServidor(cliente) }).catch((e) => console.error('[webhook] al procesar', e)),
+      procesarPendientes({ cola, servicio: crearServicioServidor(cliente), consultores }).catch((e) => console.error('[webhook] al procesar', e)),
     )
   }
   if (r.status !== 200) console.warn('[webhook] rechazado', pasarela, r.motivo)

@@ -18,6 +18,9 @@ const CAMPOS = [
 
 const tarjetaConEspacios = (n) => n.replace(/(\d{4})(?=\d)/g, '$1 ')
 
+// Tarjetas de prueba de cada pasarela real (las publica cada una en su documentación).
+const TARJETAS_PAGINA = { stripe: '4242 4242 4242 4242', mercadopago: '5474 9254 3267 0366' }
+
 export default function Checkout() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -38,8 +41,9 @@ export default function Checkout() {
   const { usuario, disponible: hayCuentas, cargando: cargandoSesion } = useSesion()
   const faltaSesion = hayCuentas && !cargandoSesion && !usuario
 
-  // Sprint 7: Stripe cobra en su propia página; las demás pasarelas siguen simuladas.
+  // Sprint 7: Stripe y Mercado Pago cobran en su propia página; PayPal sigue simulado.
   const paginaExterna = pedidos.usaPaginaDePago(pasarela)
+  const nombrePasarela = fabricaPasarelas.crearPasarela(pasarela).etiqueta
 
   // La fachada cotiza y propone la fecha de entrega según el tipo de producto y el cupo diario.
   const cotizacion = pedidos.cotizar(seleccionados, ocupacion ?? {})
@@ -228,7 +232,7 @@ export default function Checkout() {
                 </h2>
                 <p className="mb-5 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <AlertCircle size={13} className="flex-shrink-0" />
-                  {paginaExterna ? t('checkout.modoPruebaStripe') : t('checkout.modoPrueba')}
+                  {paginaExterna ? t('checkout.modoPruebaExterno', { pasarela: nombrePasarela }) : t('checkout.modoPrueba')}
                 </p>
 
                 <p className={labelClass}>{t('checkout.pagarCon')}</p>
@@ -253,10 +257,10 @@ export default function Checkout() {
                   <div className="p-4 rounded-lg bg-brand-soft border border-brand/15 text-sm text-slate-700">
                     <p className="flex items-center gap-2 text-navy font-semibold mb-1">
                       <ExternalLink size={14} className="text-brand" />
-                      {t('checkout.paginaStripe')}
+                      {t('checkout.paginaExterna', { pasarela: nombrePasarela })}
                     </p>
                     <p className="text-slate-600 text-xs">
-                      {t('checkout.tarjetaStripe')} <span className="font-mono">4242 4242 4242 4242</span> · {t('checkout.tarjetaStripeDatos')}
+                      {t('checkout.tarjetaExterna')} <span className="font-mono">{TARJETAS_PAGINA[pasarela]}</span> · {t(`checkout.datosPrueba.${pasarela}`)}
                     </p>
                   </div>
                 ) : (
@@ -301,7 +305,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <Lock size={16} />
-                    {paginaExterna ? t('checkout.pagarEnStripe') : t('checkout.pagar')} {formatoMoneda(cotizacion.totalHoy)} MXN
+                    {paginaExterna ? t('checkout.pagarEn', { pasarela: nombrePasarela }) : t('checkout.pagar')} {formatoMoneda(cotizacion.totalHoy)} MXN
                     <ArrowRight size={16} />
                   </>
                 )}

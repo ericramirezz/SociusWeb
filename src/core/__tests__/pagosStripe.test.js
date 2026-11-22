@@ -6,7 +6,8 @@ import { ConfigApp } from '../config'
 import { ESTADOS } from '../estadoOrden'
 import { BusEventos } from '../eventos'
 import { FabricaPasarelas } from '../pagos/fabricaPasarelas'
-import { aCentavos, crearPago, esPagoStripeReal, origenPermitido, parametrosSesion } from '../pagos/checkoutStripe'
+import { aCentavos, parametrosSesion } from '../pagos/checkoutStripe'
+import { crearPago, esPagoReal as esPagoStripeReal, origenPermitido } from '../pagos/paginasDePago'
 import { ColaEventosMemoria, ESTADOS_EVENTO } from '../webhooks/colaEventos'
 import { firmarStripe } from '../webhooks/firmas'
 import { procesarPendientes } from '../webhooks/procesador'
@@ -52,7 +53,7 @@ describe('Pago con la página de Stripe (Sprint 7)', () => {
     const { fetch, llamadas } = fetchFalso()
     const r = await crearPago({
       ordenId: 'SOC-100005', origen: ORIGEN, repo: repoCon(ordenCotizada()),
-      llaveSecreta: 'sk_test_x', origenesPermitidos: [ORIGEN], fetch,
+      llaves: { stripe: 'sk_test_x' }, origenesPermitidos: [ORIGEN], fetch,
     })
     expect(r).toEqual({ status: 200, cuerpo: { id: 'cs_test_1', url: 'https://checkout.stripe.com/c/pay/cs_test_1' } })
     expect(llamadas).toHaveLength(1)
@@ -63,13 +64,13 @@ describe('Pago con la página de Stripe (Sprint 7)', () => {
   })
 
   it('CP-44 crear-pago rechaza órdenes ajenas o pagadas, sitios no permitidos y errores de Stripe sin llamar de más', async () => {
-    const base = { ordenId: 'SOC-100005', origen: ORIGEN, llaveSecreta: 'sk_test_x', origenesPermitidos: [ORIGEN] }
+    const base = { ordenId: 'SOC-100005', origen: ORIGEN, llaves: { stripe: 'sk_test_x' }, origenesPermitidos: [ORIGEN] }
     const { fetch, llamadas } = fetchFalso()
     // La seguridad por fila hace que una orden de otro cliente simplemente no exista para este.
     expect(await crearPago({ ...base, repo: repoCon(null), fetch })).toEqual({ status: 404, cuerpo: { error: 'orden_no_encontrada' } })
     expect(await crearPago({ ...base, repo: repoCon(ordenCotizada({ estado: 'pagada' })), fetch })).toEqual({ status: 409, cuerpo: { error: 'orden_ya_pagada' } })
     expect(await crearPago({ ...base, origen: 'https://sitio-falso.com', repo: repoCon(ordenCotizada()), fetch })).toEqual({ status: 400, cuerpo: { error: 'origen_no_permitido' } })
-    expect(await crearPago({ ...base, llaveSecreta: undefined, repo: repoCon(ordenCotizada()), fetch })).toEqual({ status: 500, cuerpo: { error: 'sin_llave_stripe' } })
+    expect(await crearPago({ ...base, llaves: {}, repo: repoCon(ordenCotizada()), fetch })).toEqual({ status: 500, cuerpo: { error: 'sin_llave_stripe' } })
     expect(llamadas).toHaveLength(0)
 
     const conError = fetchFalso({ error: { message: 'Invalid API Key provided' } }, false)

@@ -22,11 +22,16 @@ const repoLlamadas = supabase ? new RepositorioLlamadasSupabase(supabase) : new 
 
 export const usaSupabase = Boolean(supabase)
 
-// Sprint 7: con Supabase y la llave publicable de Stripe en .env.local, Stripe cobra en
-// su propia página (Edge Function crear-pago). Mercado Pago y PayPal siguen simulados.
-// La llave publicable no se usa para cobrar (la página la arma el servidor); su
-// presencia indica que el equipo ya conectó la cuenta de prueba de Stripe.
-const stripeConectado = Boolean(supabase && import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
+// Sprint 7: con Supabase y la llave pública de la pasarela en .env.local, esa pasarela
+// cobra en su propia página (Edge Function crear-pago). PayPal sigue simulado.
+// La llave pública no se usa para cobrar (la página la arma el servidor); su
+// presencia indica que el equipo ya conectó la cuenta de prueba de esa pasarela.
+const pasarelasReales = supabase
+  ? [
+      import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY && 'stripe',
+      import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY && 'mercadopago',
+    ].filter(Boolean)
+  : []
 
 export const pedidos = new ServicioPedidos({
   repoPedidos,
@@ -35,7 +40,7 @@ export const pedidos = new ServicioPedidos({
   config,
   catalogo: programas,
   fuenteOcupacion: supabase ? (desde) => repoPedidos.arranquesPorDia(desde) : null,
-  sesionesPago: stripeConectado ? new SesionesPagoSupabase(supabase, ['stripe']) : null,
+  sesionesPago: pasarelasReales.length ? new SesionesPagoSupabase(supabase, pasarelasReales) : null,
 })
 
 export const sesion = new ServicioSesion({ cliente: supabase })

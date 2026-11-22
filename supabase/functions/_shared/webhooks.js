@@ -299,18 +299,7 @@ function transicionar(orden, evento, ahora = /* @__PURE__ */ new Date()) {
 
 // src/core/pagos/checkoutStripe.js
 var API_STRIPE = "https://api.stripe.com/v1";
-var esPagoStripeReal = (pago) => pago?.pasarela === "stripe" && /^pi_[A-Za-z0-9]{20,}$/.test(pago?.idTransaccion ?? "");
-var ErrorPago = class extends Error {
-  constructor(motivo, status) {
-    super(motivo);
-    this.motivo = motivo;
-    this.status = status;
-  }
-};
 var aCentavos = (pesos) => Math.round(Number(pesos) * 100);
-function origenPermitido(origen, permitidos) {
-  return typeof origen === "string" && permitidos.map((p) => p.trim().replace(/\/$/, "")).includes(origen.replace(/\/$/, ""));
-}
 function parametrosSesion(orden, origen) {
   const p = new URLSearchParams({
     mode: "payment",
@@ -343,23 +332,120 @@ async function crearSesionCheckout({ orden, origen, llaveSecreta, fetch = global
     body: cuerpo.toString()
   });
   const datos = await r.json().catch(() => ({}));
-  if (!r.ok || !datos.url) throw new ErrorPago(datos?.error?.message ?? "stripe_sin_respuesta", 502);
+  if (!r.ok || !datos.url) {
+    const error = new Error(datos?.error?.message ?? "stripe_sin_respuesta");
+    error.status = 502;
+    throw error;
+  }
   return { id: datos.id, url: datos.url };
 }
-async function crearPago({ ordenId, origen, repo, llaveSecreta, origenesPermitidos, fetch }) {
+
+// src/core/pagos/checkoutMercadoPago.js
+var API_MERCADOPAGO = "https://api.mercadopago.com";
+function parametrosPreferencia(orden, origen) {
+  const volver = `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`;
+  const p = {
+    items: [
+      {
+        id: orden.id,
+        title: `Socius \xB7 Orden ${orden.id}`,
+        description: (orden.partidas ?? []).map((x) => x.nombre).join(", ").slice(0, 250) || "Programas Socius",
+        quantity: 1,
+        currency_id: String(orden.moneda ?? "MXN").toUpperCase(),
+        unit_price: Number(orden.totalHoy)
+      }
+    ],
+    external_reference: orden.id,
+    metadata: { orden_id: orden.id },
+    back_urls: {
+      success: volver,
+      pending: volver,
+      // p. ej. pago en OXXO: la confirmación espera al aviso
+      failure: `${origen}/checkout?cancelado=${encodeURIComponent(orden.id)}`
+    },
+    statement_descriptor: "SOCIUS"
+  };
+  if (orden.cliente?.email) p.payer = { email: orden.cliente.email };
+  if (origen.startsWith("https://")) p.auto_return = "approved";
+  return p;
+}
+async function crearPreferencia({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
+  const r = await fetch(`${API_MERCADOPAGO}/checkout/preferences`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${llaveSecreta}`,
+      "Content-Type": "application/json",
+      // Idempotencia: si el navegador repite la petición, no se crea otra preferencia.
+      "X-Idempotency-Key": `preferencia-${orden.id}-${Math.round(Number(orden.totalHoy) * 100)}-${origen}`
+    },
+    body: JSON.stringify(parametrosPreferencia(orden, origen))
+  });
+  const datos = await r.json().catch(() => ({}));
+  const url = llaveSecreta?.startsWith("TEST-") ? datos.sandbox_init_point ?? datos.init_point : datos.init_point ?? datos.sandbox_init_point;
+  if (!r.ok || !url) {
+    const error = new Error(datos?.message ?? "mercadopago_sin_respuesta");
+    error.status = 502;
+    throw error;
+  }
+  return { id: datos.id, url };
+}
+var ESTADOS_MP = { approved: "aprobado", rejected: "rechazado", refunded: "reembolsado", cancelled: "rechazado" };
+async function consultarPagoMercadoPago(idPago, { llaveSecreta, fetch = globalThis.fetch }) {
+  if (!llaveSecreta) throw new Error("Falta MERCADOPAGO_ACCESS_TOKEN para consultar el pago");
+  const r = await fetch(`${API_MERCADOPAGO}/v1/payments/${encodeURIComponent(idPago)}`, {
+    headers: { Authorization: `Bearer ${llaveSecreta}` }
+  });
+  const p = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Mercado Pago no encontr\xF3 el pago ${idPago}: ${p?.message ?? r.status}`);
+  const estado = ESTADOS_MP[p.status] ?? "pendiente";
+  return {
+    estado,
+    referencia: p.external_reference ?? p.metadata?.orden_id ?? null,
+    idTransaccion: String(p.id ?? idPago),
+    // En un reembolso cuenta lo devuelto; en un pago, lo cobrado.
+    monto: estado === "reembolsado" ? Number(p.transaction_amount_refunded ?? p.transaction_amount) : Number(p.transaction_amount),
+    idReembolso: p.refunds?.[0]?.id != null ? String(p.refunds[0].id) : null
+  };
+}
+
+// src/core/pagos/paginasDePago.js
+var CREADORES = {
+  stripe: crearSesionCheckout,
+  mercadopago: crearPreferencia
+};
+var ErrorPago = class extends Error {
+  constructor(motivo, status) {
+    super(motivo);
+    this.motivo = motivo;
+    this.status = status;
+  }
+};
+function origenPermitido(origen, permitidos) {
+  return typeof origen === "string" && permitidos.map((p) => p.trim().replace(/\/$/, "")).includes(origen.replace(/\/$/, ""));
+}
+function esPagoReal(pago) {
+  const id = String(pago?.idTransaccion ?? "");
+  if (pago?.pasarela === "stripe") return /^pi_[A-Za-z0-9]{20,}$/.test(id);
+  if (pago?.pasarela === "mercadopago") return /^\d{6,12}$/.test(id);
+  return false;
+}
+async function crearPago({ ordenId, origen, pasarela = "stripe", repo, llaves = {}, origenesPermitidos, fetch }) {
   try {
-    if (!llaveSecreta) throw new ErrorPago("sin_llave_stripe", 500);
+    const crear = CREADORES[pasarela];
+    if (!crear) throw new ErrorPago("pasarela_sin_pagina", 400);
+    const llaveSecreta = llaves[pasarela];
+    if (!llaveSecreta) throw new ErrorPago(`sin_llave_${pasarela}`, 500);
     if (!origenPermitido(origen, origenesPermitidos)) throw new ErrorPago("origen_no_permitido", 400);
     if (!ordenId) throw new ErrorPago("sin_orden", 400);
     const orden = await repo.obtener(ordenId);
     if (!orden) throw new ErrorPago("orden_no_encontrada", 404);
     if (orden.estado !== "cotizada") throw new ErrorPago("orden_ya_pagada", 409);
     if (!(orden.totalHoy > 0)) throw new ErrorPago("monto_invalido", 400);
-    const sesion = await crearSesionCheckout({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, fetch });
-    return { status: 200, cuerpo: sesion };
+    const pagina = await crear({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, fetch });
+    return { status: 200, cuerpo: pagina };
   } catch (e) {
     if (e instanceof ErrorPago) return { status: e.status, cuerpo: { error: e.motivo } };
-    return { status: 500, cuerpo: { error: e.message } };
+    return { status: e.status ?? 500, cuerpo: { error: e.message } };
   }
 }
 
@@ -534,7 +620,7 @@ var ServicioPedidos = class {
     return this.repoPedidos.guardar(orden);
   }
   // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa;
-  // si lo cobró Stripe de verdad, se deja la solicitud para Socius (ver reembolsoManual).
+  // si lo cobró la pasarela de verdad, se deja la solicitud para Socius (ver reembolsoManual).
   async cancelar(id) {
     let orden = await this.#obtener(id);
     orden = transicionar(orden, "cancelar", this.reloj());
@@ -557,10 +643,10 @@ var ServicioPedidos = class {
     this.bus.publicar(EVENTOS.REEMBOLSO_SOLICITADO, conSolicitud);
     return conSolicitud;
   }
-  // Opción B del Sprint 7: un pago real de Stripe no lo reembolsa la app. El cliente deja
-  // la solicitud, Socius decide y reembolsa desde el panel de Stripe, y el webhook
-  // charge.refunded marca la orden como reembolsada (registrarReembolso).
-  reembolsoManual = (orden) => esPagoStripeReal(orden.pago);
+  // Opción B del Sprint 7: un pago real (Stripe o Mercado Pago) no lo reembolsa la app.
+  // El cliente deja la solicitud, Socius decide y reembolsa desde el panel de la pasarela,
+  // y su webhook marca la orden como reembolsada (registrarReembolso).
+  reembolsoManual = (orden) => esPagoReal(orden.pago);
   #solicitud(tipo, orden) {
     return { estado: ESTADO_REEMBOLSO.SOLICITADO, tipo, monto: orden.pago.monto, fecha: this.reloj().toISOString() };
   }
@@ -892,7 +978,8 @@ async function aplicar(evento, servicio, consultores) {
     const consultar = consultores[evento.pasarela];
     if (!consultar) throw new Error(`Falta conectar la consulta a la API de ${evento.pasarela} (Sprint 7)`);
     const pago = await consultar(datos.idPago);
-    datos = { ...pago, tipo: pago.estado === "aprobado" ? TIPOS.APROBADO : TIPOS.OTRO };
+    const tipo = { aprobado: TIPOS.APROBADO, reembolsado: TIPOS.REEMBOLSADO }[pago.estado] ?? TIPOS.OTRO;
+    datos = { ...pago, tipo };
   }
   if (datos.tipo === TIPOS.REEMBOLSADO) {
     const id = datos.referencia ?? await servicio.ordenPorTransaccion(evento.pasarela, datos.idTransaccion);
@@ -924,6 +1011,7 @@ function crearServicioServidor(cliente) {
 export {
   ColaEventosSupabase,
   RepositorioPedidosSupabase,
+  consultarPagoMercadoPago,
   crearPago,
   crearServicioServidor,
   procesarPendientes,

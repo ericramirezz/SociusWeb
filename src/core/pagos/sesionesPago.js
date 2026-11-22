@@ -1,4 +1,4 @@
-// Pagos en la página de la pasarela (Sprint 7), lado del navegador.
+// Pagos en la página de la pasarela (Sprint 7: Stripe y Mercado Pago), lado del navegador.
 // No cobra nada aquí: le pide a la Edge Function crear-pago la URL de la página
 // de pago (la llave secreta vive solo en el servidor). Quien confirma el pago es
 // el webhook firmado de la pasarela, no el navegador.
@@ -12,8 +12,8 @@ export class SesionesPagoSupabase {
     return this.pasarelas.includes(pasarela)
   }
 
-  async crear({ ordenId, origen }) {
-    const { data, error } = await this.cliente.functions.invoke('crear-pago', { body: { ordenId, origen } })
+  async crear({ ordenId, origen, pasarela }) {
+    const { data, error } = await this.cliente.functions.invoke('crear-pago', { body: { ordenId, origen, pasarela } })
     if (error) {
       // La función responde { error: 'motivo' }; se muestra ese motivo si viene.
       let motivo

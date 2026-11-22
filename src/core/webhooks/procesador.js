@@ -29,7 +29,8 @@ async function aplicar(evento, servicio, consultores) {
     const consultar = consultores[evento.pasarela]
     if (!consultar) throw new Error(`Falta conectar la consulta a la API de ${evento.pasarela} (Sprint 7)`)
     const pago = await consultar(datos.idPago)
-    datos = { ...pago, tipo: pago.estado === 'aprobado' ? TIPOS.APROBADO : TIPOS.OTRO }
+    const tipo = { aprobado: TIPOS.APROBADO, reembolsado: TIPOS.REEMBOLSADO }[pago.estado] ?? TIPOS.OTRO
+    datos = { ...pago, tipo }
   }
 
   if (datos.tipo === TIPOS.REEMBOLSADO) {
