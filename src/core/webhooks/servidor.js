@@ -14,6 +14,7 @@ export { procesarPendientes } from './procesador'
 export { ColaEventosSupabase } from './colaEventos'
 export { crearPago } from '../pagos/paginasDePago'
 export { consultarPagoMercadoPago } from '../pagos/checkoutMercadoPago'
+export { capturarOrdenPayPal } from '../pagos/checkoutPayPal'
 export { RepositorioPedidosSupabase }
 
 // El mismo ServicioPedidos de la app, pero con el cliente de Supabase del servidor

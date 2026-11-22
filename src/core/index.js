@@ -23,13 +23,14 @@ const repoLlamadas = supabase ? new RepositorioLlamadasSupabase(supabase) : new 
 export const usaSupabase = Boolean(supabase)
 
 // Sprint 7: con Supabase y la llave pública de la pasarela en .env.local, esa pasarela
-// cobra en su propia página (Edge Function crear-pago). PayPal sigue simulado.
+// cobra en su propia página (Edge Function crear-pago); sin ella, sigue simulada.
 // La llave pública no se usa para cobrar (la página la arma el servidor); su
 // presencia indica que el equipo ya conectó la cuenta de prueba de esa pasarela.
 const pasarelasReales = supabase
   ? [
       import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY && 'stripe',
       import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY && 'mercadopago',
+      import.meta.env.VITE_PAYPAL_CLIENT_ID && 'paypal',
     ].filter(Boolean)
   : []
 

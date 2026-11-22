@@ -19,6 +19,7 @@ const CAMPOS = [
 const tarjetaConEspacios = (n) => n.replace(/(\d{4})(?=\d)/g, '$1 ')
 
 // Tarjetas de prueba de cada pasarela real (las publica cada una en su documentación).
+// PayPal no lleva tarjeta: se paga entrando con la cuenta personal de prueba (sandbox).
 const TARJETAS_PAGINA = { stripe: '4242 4242 4242 4242', mercadopago: '5474 9254 3267 0366' }
 
 export default function Checkout() {
@@ -41,7 +42,7 @@ export default function Checkout() {
   const { usuario, disponible: hayCuentas, cargando: cargandoSesion } = useSesion()
   const faltaSesion = hayCuentas && !cargandoSesion && !usuario
 
-  // Sprint 7: Stripe y Mercado Pago cobran en su propia página; PayPal sigue simulado.
+  // Sprint 7: Stripe, Mercado Pago y PayPal cobran en su propia página (si están conectadas).
   const paginaExterna = pedidos.usaPaginaDePago(pasarela)
   const nombrePasarela = fabricaPasarelas.crearPasarela(pasarela).etiqueta
 
@@ -260,7 +261,8 @@ export default function Checkout() {
                       {t('checkout.paginaExterna', { pasarela: nombrePasarela })}
                     </p>
                     <p className="text-slate-600 text-xs">
-                      {t('checkout.tarjetaExterna')} <span className="font-mono">{TARJETAS_PAGINA[pasarela]}</span> · {t(`checkout.datosPrueba.${pasarela}`)}
+                      {TARJETAS_PAGINA[pasarela] && <>{t('checkout.tarjetaExterna')} <span className="font-mono">{TARJETAS_PAGINA[pasarela]}</span> · </>}
+                      {t(`checkout.datosPrueba.${pasarela}`)}
                     </p>
                   </div>
                 ) : (

@@ -57,7 +57,33 @@ function traducirMercadoPago(datos) {
   }
 }
 
+// PayPal manda el recurso completo. Cuando el cliente aprueba, la orden aún no está
+// cobrada: el consumidor la captura (su "consultor" de PayPal es capturarOrdenPayPal).
+function traducirPayPal(datos) {
+  const r = datos?.resource ?? {}
+  const base = { eventoId: datos?.id, referencia: r.custom_id ?? null, idTransaccion: r.id ?? null, monto: r.amount?.value != null ? Number(r.amount.value) : null }
+  switch (datos?.event_type) {
+    case 'CHECKOUT.ORDER.APPROVED': {
+      const unidad = r.purchase_units?.[0] ?? {}
+      return { ...base, tipo: TIPOS.CONSULTAR, idPago: r.id ?? null, referencia: unidad.custom_id ?? unidad.reference_id ?? null, monto: null }
+    }
+    case 'PAYMENT.CAPTURE.COMPLETED':
+      return { ...base, tipo: TIPOS.APROBADO }
+    case 'PAYMENT.CAPTURE.DENIED':
+    case 'PAYMENT.CAPTURE.DECLINED':
+      return { ...base, tipo: TIPOS.RECHAZADO }
+    case 'PAYMENT.CAPTURE.REFUNDED': {
+      // El recurso es el reembolso; su liga "up" apunta a la captura que se devolvió.
+      const captura = r.links?.find((l) => l.rel === 'up')?.href?.split('/').pop() ?? null
+      return { ...base, tipo: TIPOS.REEMBOLSADO, idTransaccion: captura, idReembolso: r.id ?? null }
+    }
+    default:
+      return { ...base, tipo: TIPOS.OTRO }
+  }
+}
+
 export const TRADUCTORES = {
   stripe: traducirStripe,
   mercadopago: traducirMercadoPago,
+  paypal: traducirPayPal,
 }

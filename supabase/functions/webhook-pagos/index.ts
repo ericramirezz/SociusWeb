@@ -1,18 +1,23 @@
 // Edge Function: recibe los avisos de las pasarelas (webhooks).
 // URL: https://<proyecto>.supabase.co/functions/v1/webhook-pagos/<pasarela>
-//      (<pasarela> = stripe o mercadopago)
+//      (<pasarela> = stripe, mercadopago o paypal)
 // Se publica con --no-verify-jwt: la pasarela no tiene sesión de Supabase; lo que
 // la autentica es la firma del aviso, que se revisa en recibirWebhook().
 //
 // La lógica vive en src/core/webhooks/ (con pruebas CP-37 a CP-41) y llega aquí
 // empaquetada en ../_shared/webhooks.js con `npm run build:funciones`.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { ColaEventosSupabase, consultarPagoMercadoPago, crearServicioServidor, procesarPendientes, recibirWebhook } from '../_shared/webhooks.js'
+import { ColaEventosSupabase, capturarOrdenPayPal, consultarPagoMercadoPago, crearServicioServidor, procesarPendientes, recibirWebhook } from '../_shared/webhooks.js'
 
 // Mercado Pago solo avisa "cambió el pago X": el consumidor le pregunta a su API.
+// PayPal avisa "el cliente aprobó la orden X": el consumidor la captura.
 const consultores = {
   mercadopago: (idPago: string) => consultarPagoMercadoPago(idPago, { llaveSecreta: Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') }),
+  // PayPal: la orden aprobada se captura (se cobra) y se lee el resultado.
+  paypal: (idOrden: string) => capturarOrdenPayPal(idOrden, { credenciales: { clientId: Deno.env.get('PAYPAL_CLIENT_ID'), secreto: Deno.env.get('PAYPAL_CLIENT_SECRET') } }),
 }
+
+const paypal = { clientId: Deno.env.get('PAYPAL_CLIENT_ID'), secreto: Deno.env.get('PAYPAL_CLIENT_SECRET') }
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Método no permitido', { status: 405 })
@@ -31,6 +36,8 @@ Deno.serve(async (req) => {
     secretos: {
       stripe: Deno.env.get('STRIPE_WEBHOOK_SECRET'),
       mercadopago: Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET'),
+      // PayPal verifica con su API: credenciales + el Webhook ID registrado en su panel.
+      paypal: Deno.env.get('PAYPAL_WEBHOOK_ID') && { ...paypal, webhookId: Deno.env.get('PAYPAL_WEBHOOK_ID') },
     },
     cola,
   })

@@ -7,7 +7,7 @@ import { TRADUCTORES } from './traductores'
 
 // Respuesta HTTP que se le da a la pasarela:
 //   200 recibido / duplicado · 400 firma o contenido inválido · 404 pasarela desconocida · 500 falta configurar el secreto
-export async function recibirWebhook({ pasarela, cuerpo, encabezados = {}, secretos = {}, cola, reloj = () => new Date() }) {
+export async function recibirWebhook({ pasarela, cuerpo, encabezados = {}, secretos = {}, cola, reloj = () => new Date(), fetch }) {
   const verificar = VERIFICADORES[pasarela]
   if (!verificar) return { status: 404, motivo: 'pasarela_desconocida' }
   const secreto = secretos[pasarela]
@@ -15,7 +15,7 @@ export async function recibirWebhook({ pasarela, cuerpo, encabezados = {}, secre
 
   // Los nombres de encabezado llegan con mayúsculas distintas según el servidor.
   const enc = Object.fromEntries(Object.entries(encabezados).map(([k, v]) => [k.toLowerCase(), v]))
-  const firma = await verificar(cuerpo, enc, secreto, reloj())
+  const firma = await verificar(cuerpo, enc, secreto, reloj(), fetch) // fetch: solo PayPal, que verifica con su API
   if (!firma.ok) return { status: 400, motivo: firma.motivo }
 
   let datos

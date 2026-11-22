@@ -1,14 +1,16 @@
 // Sprint 7: lo que comparten las pasarelas que cobran en su propia página
-// (Stripe Checkout y Mercado Pago Checkout Pro). Corre en la Edge Function crear-pago.
+// (Stripe Checkout, Mercado Pago Checkout Pro y PayPal Checkout). Corre en la Edge Function crear-pago.
 //
 // PATRÓN: Strategy. Cada pasarela aporta su forma de crear la página de pago;
 // las reglas comunes (quién puede pedirla, por qué monto, a dónde regresa) viven aquí una vez.
 import { crearSesionCheckout } from './checkoutStripe'
 import { crearPreferencia } from './checkoutMercadoPago'
+import { crearOrdenPayPal } from './checkoutPayPal'
 
 export const CREADORES = {
   stripe: crearSesionCheckout,
   mercadopago: crearPreferencia,
+  paypal: crearOrdenPayPal,
 }
 
 // Error con el código HTTP que debe responder la Edge Function.
@@ -30,10 +32,12 @@ export function origenPermitido(origen, permitidos) {
 // lo hace la app (simulado) o Socius desde el panel de la pasarela (real).
 //   Stripe: los PaymentIntent reales traen 24 caracteres después de "pi_"; los simulados, 10.
 //   Mercado Pago: los ids reales tienen hasta 12 dígitos; el simulado usa Date.now() (13).
+//   PayPal: las capturas reales tienen 17 letras y números en mayúsculas; las simuladas empiezan con "PP-".
 export function esPagoReal(pago) {
   const id = String(pago?.idTransaccion ?? '')
   if (pago?.pasarela === 'stripe') return /^pi_[A-Za-z0-9]{20,}$/.test(id)
   if (pago?.pasarela === 'mercadopago') return /^\d{6,12}$/.test(id)
+  if (pago?.pasarela === 'paypal') return /^[A-Z0-9]{17}$/.test(id)
   return false
 }
 

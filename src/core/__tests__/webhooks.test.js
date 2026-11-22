@@ -71,7 +71,7 @@ describe('Webhooks de pago firmados', () => {
     const alterado = cuerpo.replace(String(orden.totalHoy * 100), '100')
     expect(await recibirWebhook({ pasarela: 'stripe', cuerpo: alterado, encabezados: { 'Stripe-Signature': firma }, secretos: SECRETOS, cola, reloj }))
       .toEqual({ status: 400, motivo: 'firma_invalida' })
-    expect(await recibirWebhook({ pasarela: 'paypal', cuerpo, secretos: SECRETOS, cola, reloj })).toEqual({ status: 404, motivo: 'pasarela_desconocida' })
+    expect(await recibirWebhook({ pasarela: 'conekta', cuerpo, secretos: SECRETOS, cola, reloj })).toEqual({ status: 404, motivo: 'pasarela_desconocida' })
     expect(await cola.listar()).toHaveLength(0)
   })
 

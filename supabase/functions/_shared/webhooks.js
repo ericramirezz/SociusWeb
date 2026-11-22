@@ -408,10 +408,137 @@ async function consultarPagoMercadoPago(idPago, { llaveSecreta, fetch = globalTh
   };
 }
 
+// src/core/pagos/checkoutPayPal.js
+var API_PAYPAL = "https://api-m.sandbox.paypal.com";
+var tokens = /* @__PURE__ */ new Map();
+async function tokenPayPal({ clientId, secreto }, { fetch = globalThis.fetch, ahora = Date.now() } = {}) {
+  if (!clientId || !secreto) throw new Error("Faltan PAYPAL_CLIENT_ID o PAYPAL_CLIENT_SECRET");
+  const guardado = tokens.get(clientId);
+  if (guardado && guardado.vence > ahora) return guardado.token;
+  const r = await fetch(`${API_PAYPAL}/v1/oauth2/token`, {
+    method: "POST",
+    headers: { Authorization: `Basic ${btoa(`${clientId}:${secreto}`)}`, "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=client_credentials"
+  });
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok || !datos.access_token) {
+    const error = new Error(`PayPal no acept\xF3 las credenciales: ${datos?.error_description ?? r.status}`);
+    error.status = 502;
+    throw error;
+  }
+  tokens.set(clientId, { token: datos.access_token, vence: ahora + (Number(datos.expires_in ?? 0) - 60) * 1e3 });
+  return datos.access_token;
+}
+function parametrosOrden(orden, origen) {
+  const moneda = String(orden.moneda ?? "MXN").toUpperCase();
+  return {
+    intent: "CAPTURE",
+    purchase_units: [
+      {
+        reference_id: orden.id,
+        custom_id: orden.id,
+        description: `Socius \xB7 Orden ${orden.id}: ${(orden.partidas ?? []).map((x) => x.nombre).join(", ") || "Programas Socius"}`.slice(0, 127),
+        amount: { currency_code: moneda, value: Number(orden.totalHoy).toFixed(2) }
+      }
+    ],
+    payment_source: {
+      paypal: {
+        experience_context: {
+          brand_name: "Socius",
+          locale: "es-MX",
+          shipping_preference: "NO_SHIPPING",
+          // no se envía nada físico
+          user_action: "PAY_NOW",
+          // el botón de PayPal dice "Pagar ahora"
+          return_url: `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`,
+          cancel_url: `${origen}/checkout?cancelado=${encodeURIComponent(orden.id)}`
+        }
+      }
+    }
+  };
+}
+async function crearOrdenPayPal({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
+  const token = await tokenPayPal(llaveSecreta, { fetch });
+  const r = await fetch(`${API_PAYPAL}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      // Idempotencia: si el navegador repite la petición, PayPal devuelve la misma orden.
+      "PayPal-Request-Id": `orden-${orden.id}-${Math.round(Number(orden.totalHoy) * 100)}-${origen}`.slice(0, 108)
+    },
+    body: JSON.stringify(parametrosOrden(orden, origen))
+  });
+  const datos = await r.json().catch(() => ({}));
+  const url = datos.links?.find((l) => l.rel === "payer-action" || l.rel === "approve")?.href;
+  if (!r.ok || !url) {
+    const error = new Error(datos?.details?.[0]?.description ?? datos?.message ?? "paypal_sin_respuesta");
+    error.status = 502;
+    throw error;
+  }
+  return { id: datos.id, url };
+}
+var ESTADOS_CAPTURA = { COMPLETED: "aprobado", DECLINED: "rechazado", FAILED: "rechazado", REFUNDED: "reembolsado" };
+function leerCaptura(datos, idOrden) {
+  const unidad = datos.purchase_units?.[0] ?? {};
+  const captura = unidad.payments?.captures?.[0];
+  return {
+    estado: ESTADOS_CAPTURA[captura?.status] ?? "pendiente",
+    referencia: captura?.custom_id ?? unidad.custom_id ?? unidad.reference_id ?? null,
+    idTransaccion: captura?.id ?? idOrden,
+    // el id de la captura es el que se usa para reembolsar
+    monto: captura?.amount?.value != null ? Number(captura.amount.value) : null
+  };
+}
+async function capturarOrdenPayPal(idOrden, { credenciales, fetch = globalThis.fetch }) {
+  const token = await tokenPayPal(credenciales, { fetch });
+  const encabezados = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const r = await fetch(`${API_PAYPAL}/v2/checkout/orders/${encodeURIComponent(idOrden)}/capture`, {
+    method: "POST",
+    headers: { ...encabezados, "PayPal-Request-Id": `captura-${idOrden}` }
+  });
+  let datos = await r.json().catch(() => ({}));
+  if (!r.ok && datos?.details?.some((d) => d.issue === "ORDER_ALREADY_CAPTURED")) {
+    const consulta = await fetch(`${API_PAYPAL}/v2/checkout/orders/${encodeURIComponent(idOrden)}`, { headers: encabezados });
+    datos = await consulta.json().catch(() => ({}));
+    if (!consulta.ok) throw new Error(`PayPal no encontr\xF3 la orden ${idOrden}: ${consulta.status}`);
+  } else if (!r.ok) {
+    throw new Error(`PayPal no pudo capturar la orden ${idOrden}: ${datos?.details?.[0]?.issue ?? datos?.message ?? r.status}`);
+  }
+  return leerCaptura(datos, idOrden);
+}
+async function verificarAvisoPayPal(cuerpo, encabezados, { clientId, secreto, webhookId }, { fetch = globalThis.fetch } = {}) {
+  const campos = {
+    auth_algo: encabezados["paypal-auth-algo"],
+    cert_url: encabezados["paypal-cert-url"],
+    transmission_id: encabezados["paypal-transmission-id"],
+    transmission_sig: encabezados["paypal-transmission-sig"],
+    transmission_time: encabezados["paypal-transmission-time"]
+  };
+  if (Object.values(campos).some((v) => !v)) return { ok: false, motivo: "sin_firma" };
+  if (!webhookId) return { ok: false, motivo: "sin_webhook_id" };
+  let evento;
+  try {
+    evento = JSON.parse(cuerpo);
+  } catch {
+    return { ok: false, motivo: "json_invalido" };
+  }
+  const token = await tokenPayPal({ clientId, secreto }, { fetch });
+  const r = await fetch(`${API_PAYPAL}/v1/notifications/verify-webhook-signature`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ ...campos, webhook_id: webhookId, webhook_event: evento })
+  });
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok) return { ok: false, motivo: "verificacion_no_disponible" };
+  return datos.verification_status === "SUCCESS" ? { ok: true } : { ok: false, motivo: "firma_invalida" };
+}
+
 // src/core/pagos/paginasDePago.js
 var CREADORES = {
   stripe: crearSesionCheckout,
-  mercadopago: crearPreferencia
+  mercadopago: crearPreferencia,
+  paypal: crearOrdenPayPal
 };
 var ErrorPago = class extends Error {
   constructor(motivo, status) {
@@ -427,6 +554,7 @@ function esPagoReal(pago) {
   const id = String(pago?.idTransaccion ?? "");
   if (pago?.pasarela === "stripe") return /^pi_[A-Za-z0-9]{20,}$/.test(id);
   if (pago?.pasarela === "mercadopago") return /^\d{6,12}$/.test(id);
+  if (pago?.pasarela === "paypal") return /^[A-Z0-9]{17}$/.test(id);
   return false;
 }
 async function crearPago({ ordenId, origen, pasarela = "stripe", repo, llaves = {}, urlsAvisos = {}, origenesPermitidos, fetch }) {
@@ -837,9 +965,11 @@ async function verificarMercadoPago(cuerpo, encabezados, secreto) {
   const esperada = await hmacHex(secreto, `id:${idFirmado};request-id:${encabezados["x-request-id"] ?? ""};ts:${ts};`);
   return igualSeguro(v1, esperada) ? { ok: true } : mal("firma_invalida");
 }
+var verificarPayPal = (cuerpo, encabezados, credenciales, _ahora, fetch) => verificarAvisoPayPal(cuerpo, encabezados, credenciales, { fetch });
 var VERIFICADORES = {
   stripe: verificarStripe,
-  mercadopago: verificarMercadoPago
+  mercadopago: verificarMercadoPago,
+  paypal: verificarPayPal
 };
 
 // src/core/webhooks/traductores.js
@@ -888,19 +1018,41 @@ function traducirMercadoPago(datos) {
     monto: null
   };
 }
+function traducirPayPal(datos) {
+  const r = datos?.resource ?? {};
+  const base = { eventoId: datos?.id, referencia: r.custom_id ?? null, idTransaccion: r.id ?? null, monto: r.amount?.value != null ? Number(r.amount.value) : null };
+  switch (datos?.event_type) {
+    case "CHECKOUT.ORDER.APPROVED": {
+      const unidad = r.purchase_units?.[0] ?? {};
+      return { ...base, tipo: TIPOS.CONSULTAR, idPago: r.id ?? null, referencia: unidad.custom_id ?? unidad.reference_id ?? null, monto: null };
+    }
+    case "PAYMENT.CAPTURE.COMPLETED":
+      return { ...base, tipo: TIPOS.APROBADO };
+    case "PAYMENT.CAPTURE.DENIED":
+    case "PAYMENT.CAPTURE.DECLINED":
+      return { ...base, tipo: TIPOS.RECHAZADO };
+    case "PAYMENT.CAPTURE.REFUNDED": {
+      const captura = r.links?.find((l) => l.rel === "up")?.href?.split("/").pop() ?? null;
+      return { ...base, tipo: TIPOS.REEMBOLSADO, idTransaccion: captura, idReembolso: r.id ?? null };
+    }
+    default:
+      return { ...base, tipo: TIPOS.OTRO };
+  }
+}
 var TRADUCTORES = {
   stripe: traducirStripe,
-  mercadopago: traducirMercadoPago
+  mercadopago: traducirMercadoPago,
+  paypal: traducirPayPal
 };
 
 // src/core/webhooks/receptor.js
-async function recibirWebhook({ pasarela, cuerpo, encabezados = {}, secretos = {}, cola, reloj = () => /* @__PURE__ */ new Date() }) {
+async function recibirWebhook({ pasarela, cuerpo, encabezados = {}, secretos = {}, cola, reloj = () => /* @__PURE__ */ new Date(), fetch }) {
   const verificar = VERIFICADORES[pasarela];
   if (!verificar) return { status: 404, motivo: "pasarela_desconocida" };
   const secreto = secretos[pasarela];
   if (!secreto) return { status: 500, motivo: "sin_secreto" };
   const enc = Object.fromEntries(Object.entries(encabezados).map(([k, v]) => [k.toLowerCase(), v]));
-  const firma = await verificar(cuerpo, enc, secreto, reloj());
+  const firma = await verificar(cuerpo, enc, secreto, reloj(), fetch);
   if (!firma.ok) return { status: 400, motivo: firma.motivo };
   let datos;
   try {
@@ -982,7 +1134,7 @@ async function aplicar(evento, servicio, consultores) {
     if (!consultar) throw new Error(`Falta conectar la consulta a la API de ${evento.pasarela} (Sprint 7)`);
     const pago = await consultar(datos.idPago);
     const tipo = { aprobado: TIPOS.APROBADO, reembolsado: TIPOS.REEMBOLSADO }[pago.estado] ?? TIPOS.OTRO;
-    datos = { ...pago, tipo };
+    datos = { ...pago, referencia: pago.referencia ?? datos.referencia, tipo };
   }
   if (datos.tipo === TIPOS.REEMBOLSADO) {
     const id = datos.referencia ?? await servicio.ordenPorTransaccion(evento.pasarela, datos.idTransaccion);
@@ -1014,6 +1166,7 @@ function crearServicioServidor(cliente) {
 export {
   ColaEventosSupabase,
   RepositorioPedidosSupabase,
+  capturarOrdenPayPal,
   consultarPagoMercadoPago,
   crearPago,
   crearServicioServidor,

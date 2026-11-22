@@ -6,7 +6,8 @@ import { MAX_INTENTOS } from './colaEventos'
 import { TIPOS, TRADUCTORES } from './traductores'
 
 // consultores[pasarela](idPago) → { estado: 'aprobado' | 'rechazado' | ..., referencia, idTransaccion, monto }
-// Lo necesitan las pasarelas que no mandan el pago completo en el aviso (Mercado Pago).
+// Lo necesitan las pasarelas que no mandan el pago completo en el aviso (Mercado Pago)
+// y PayPal, donde "consultar" una orden aprobada es capturarla (cobrarla) y leer el resultado.
 export async function procesarPendientes({ cola, servicio, consultores = {}, limite = 10, maxIntentos = MAX_INTENTOS }) {
   const resumen = { procesados: 0, fallidos: 0 }
   for (const evento of await cola.tomar(limite)) {
@@ -30,7 +31,7 @@ async function aplicar(evento, servicio, consultores) {
     if (!consultar) throw new Error(`Falta conectar la consulta a la API de ${evento.pasarela} (Sprint 7)`)
     const pago = await consultar(datos.idPago)
     const tipo = { aprobado: TIPOS.APROBADO, reembolsado: TIPOS.REEMBOLSADO }[pago.estado] ?? TIPOS.OTRO
-    datos = { ...pago, tipo }
+    datos = { ...pago, referencia: pago.referencia ?? datos.referencia, tipo }
   }
 
   if (datos.tipo === TIPOS.REEMBOLSADO) {

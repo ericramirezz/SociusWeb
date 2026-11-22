@@ -8,6 +8,8 @@
 // Usa Web Crypto (crypto.subtle), que existe igual en Node, en el navegador y en
 // las Edge Functions de Supabase (Deno).
 
+import { verificarAvisoPayPal } from '../pagos/checkoutPayPal'
+
 const texto = new TextEncoder()
 
 export async function hmacHex(secreto, mensaje) {
@@ -65,11 +67,14 @@ async function verificarMercadoPago(cuerpo, encabezados, secreto) {
   return igualSeguro(v1, esperada) ? { ok: true } : mal('firma_invalida')
 }
 
-// PayPal no firma con una clave compartida: hay que preguntarle a su API si el aviso es suyo.
-// Se conecta en el Sprint 7, junto con las cuentas reales.
+// PayPal no firma con una clave compartida: se le pregunta a su API si el aviso es suyo
+// (checkoutPayPal.js). Su "secreto" son las credenciales + el Webhook ID.
+const verificarPayPal = (cuerpo, encabezados, credenciales, _ahora, fetch) => verificarAvisoPayPal(cuerpo, encabezados, credenciales, { fetch })
+
 export const VERIFICADORES = {
   stripe: verificarStripe,
   mercadopago: verificarMercadoPago,
+  paypal: verificarPayPal,
 }
 
 // Lo que hace la pasarela al mandar un aviso; lo usan las pruebas y scripts/simular-webhook.mjs.

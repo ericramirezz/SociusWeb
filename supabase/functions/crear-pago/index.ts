@@ -1,7 +1,7 @@
 // Edge Function: crea la página de pago de la pasarela para una orden
-// (Stripe Checkout o Mercado Pago Checkout Pro).
+// (Stripe Checkout, Mercado Pago Checkout Pro o PayPal Checkout).
 // URL: https://<proyecto>.supabase.co/functions/v1/crear-pago   (la llama el checkout)
-// Cuerpo: { ordenId: 'SOC-100005', origen: 'http://localhost:5173', pasarela: 'stripe' | 'mercadopago' }
+// Cuerpo: { ordenId: 'SOC-100005', origen: 'http://localhost:5173', pasarela: 'stripe' | 'mercadopago' | 'paypal' }
 // Respuesta: { id, url } → el navegador manda al cliente a `url`.
 //
 // Se publica con --no-verify-jwt y la sesión se revisa aquí con getUser(): así funciona
@@ -9,7 +9,7 @@
 // de modo que la seguridad por fila impide pedir la página de pago de una orden ajena.
 // El monto sale de la base, nunca del navegador.
 //
-// Secretos: STRIPE_SECRET_KEY (sk_test_…), MERCADOPAGO_ACCESS_TOKEN y, para la versión publicada del sitio,
+// Secretos: STRIPE_SECRET_KEY (sk_test_…), MERCADOPAGO_ACCESS_TOKEN, PAYPAL_CLIENT_ID + PAYPAL_CLIENT_SECRET (sandbox) y, para la versión publicada del sitio,
 // ORIGENES_PERMITIDOS (lista separada por comas; por defecto solo localhost:5173).
 //
 // La lógica vive en src/core/pagos/ (paginasDePago.js, con pruebas) y llega aquí
@@ -45,6 +45,9 @@ Deno.serve(async (req) => {
     llaves: {
       stripe: Deno.env.get('STRIPE_SECRET_KEY'),
       mercadopago: Deno.env.get('MERCADOPAGO_ACCESS_TOKEN'),
+      paypal: Deno.env.get('PAYPAL_CLIENT_ID') && Deno.env.get('PAYPAL_CLIENT_SECRET')
+        ? { clientId: Deno.env.get('PAYPAL_CLIENT_ID'), secreto: Deno.env.get('PAYPAL_CLIENT_SECRET') }
+        : undefined,
     },
     urlsAvisos: { mercadopago: `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook-pagos/mercadopago` },
     origenesPermitidos: (Deno.env.get('ORIGENES_PERMITIDOS') ?? 'http://localhost:5173').split(','),

@@ -303,6 +303,7 @@ export default {
     datosPrueba: {
       stripe: 'any future date and any CVC.',
       mercadopago: 'holder APRO, expiry 11/30, CVV 123. Open it in an incognito window.',
+      paypal: 'Sign in with the PayPal sandbox personal account, not your real one. Open it in an incognito window.',
     },
     pagarEn: 'Pay on {pasarela}',
     cancelado: 'The payment was not completed and nothing was charged. You can try again.',

@@ -273,6 +273,7 @@ export default {
     datosPrueba: {
       stripe: 'cualquier fecha futura y cualquier CVC.',
       mercadopago: 'titular APRO, vencimiento 11/30, CVV 123. Ábrelo en una ventana de incógnito.',
+      paypal: 'Entra con la cuenta personal de prueba (sandbox) de PayPal, no con tu cuenta real. Ábrelo en una ventana de incógnito.',
     },
     pagarEn: 'Pagar en {pasarela}',
     cancelado: 'No se completó el pago y no se hizo ningún cargo. Puedes intentarlo de nuevo.',
