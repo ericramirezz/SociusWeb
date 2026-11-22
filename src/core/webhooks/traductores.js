@@ -45,7 +45,10 @@ function traducirStripe(datos) {
 function traducirMercadoPago(datos) {
   const idPago = datos?.data?.id != null ? String(datos.data.id) : null
   return {
-    eventoId: String(datos?.id ?? `${datos?.action}:${idPago}`),
+    // Número de aviso + pago: un reenvío del mismo aviso sigue siendo duplicado, pero dos
+    // avisos con el mismo número y distinto pago no chocan (el simulador del panel usa
+    // siempre "id": "123456").
+    eventoId: `${datos?.id ?? datos?.action}:${idPago}`,
     tipo: datos?.type === 'payment' && idPago ? TIPOS.CONSULTAR : TIPOS.OTRO,
     idPago,
     referencia: null,

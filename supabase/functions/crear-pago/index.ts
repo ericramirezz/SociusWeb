@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
       stripe: Deno.env.get('STRIPE_SECRET_KEY'),
       mercadopago: Deno.env.get('MERCADOPAGO_ACCESS_TOKEN'),
     },
+    urlsAvisos: { mercadopago: `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook-pagos/mercadopago` },
     origenesPermitidos: (Deno.env.get('ORIGENES_PERMITIDOS') ?? 'http://localhost:5173').split(','),
   })
   if (r.status !== 200) console.warn('[crear-pago]', pasarela, ordenId, r.cuerpo)

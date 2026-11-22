@@ -9,7 +9,10 @@
 export const API_MERCADOPAGO = 'https://api.mercadopago.com'
 
 // Cuerpo de la "preferencia" (Mercado Pago recibe JSON y montos en pesos, no centavos).
-export function parametrosPreferencia(orden, origen) {
+// urlAvisos: a dónde avisa Mercado Pago de ESTE pago (webhook-pagos/mercadopago). Se manda en
+// cada preferencia porque, en modo prueba, Mercado Pago no siempre usa la URL configurada en
+// el panel. "source_news=webhooks" pide el formato nuevo (firmado), no el antiguo IPN.
+export function parametrosPreferencia(orden, origen, urlAvisos) {
   const volver = `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`
   const p = {
     items: [
@@ -37,11 +40,12 @@ export function parametrosPreferencia(orden, origen) {
   // El regreso automático solo se acepta con sitios https; en localhost el cliente
   // da clic en "Volver al sitio" después de pagar.
   if (origen.startsWith('https://')) p.auto_return = 'approved'
+  if (urlAvisos) p.notification_url = `${urlAvisos}?source_news=webhooks`
   return p
 }
 
 // Crea la preferencia y devuelve la URL de la página de pago de Mercado Pago.
-export async function crearPreferencia({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
+export async function crearPreferencia({ orden, origen, llaveSecreta, urlAvisos, fetch = globalThis.fetch }) {
   const r = await fetch(`${API_MERCADOPAGO}/checkout/preferences`, {
     method: 'POST',
     headers: {
@@ -50,7 +54,7 @@ export async function crearPreferencia({ orden, origen, llaveSecreta, fetch = gl
       // Idempotencia: si el navegador repite la petición, no se crea otra preferencia.
       'X-Idempotency-Key': `preferencia-${orden.id}-${Math.round(Number(orden.totalHoy) * 100)}-${origen}`,
     },
-    body: JSON.stringify(parametrosPreferencia(orden, origen)),
+    body: JSON.stringify(parametrosPreferencia(orden, origen, urlAvisos)),
   })
   const datos = await r.json().catch(() => ({}))
   // Las credenciales antiguas de prueba (TEST-…) usan la página "sandbox".

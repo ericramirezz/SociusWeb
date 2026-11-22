@@ -40,7 +40,8 @@ export function esPagoReal(pago) {
 // Lo que hace la Edge Function crear-pago, sin nada de Deno para poder probarlo.
 // `repo` usa la sesión del cliente: por la seguridad por fila, solo ve sus propias órdenes.
 // El monto sale de la orden guardada en la base, nunca de lo que mande el navegador.
-export async function crearPago({ ordenId, origen, pasarela = 'stripe', repo, llaves = {}, origenesPermitidos, fetch }) {
+// urlsAvisos (opcional): { pasarela: URL de webhook-pagos } para las pasarelas que la reciben por pago.
+export async function crearPago({ ordenId, origen, pasarela = 'stripe', repo, llaves = {}, urlsAvisos = {}, origenesPermitidos, fetch }) {
   try {
     const crear = CREADORES[pasarela]
     if (!crear) throw new ErrorPago('pasarela_sin_pagina', 400)
@@ -52,7 +53,7 @@ export async function crearPago({ ordenId, origen, pasarela = 'stripe', repo, ll
     if (!orden) throw new ErrorPago('orden_no_encontrada', 404)
     if (orden.estado !== 'cotizada') throw new ErrorPago('orden_ya_pagada', 409)
     if (!(orden.totalHoy > 0)) throw new ErrorPago('monto_invalido', 400)
-    const pagina = await crear({ orden, origen: origen.replace(/\/$/, ''), llaveSecreta, fetch })
+    const pagina = await crear({ orden, origen: origen.replace(/\/$/, ''), llaveSecreta, urlAvisos: urlsAvisos[pasarela], fetch })
     return { status: 200, cuerpo: pagina }
   } catch (e) {
     if (e instanceof ErrorPago) return { status: e.status, cuerpo: { error: e.motivo } }

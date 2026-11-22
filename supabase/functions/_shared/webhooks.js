@@ -342,7 +342,7 @@ async function crearSesionCheckout({ orden, origen, llaveSecreta, fetch = global
 
 // src/core/pagos/checkoutMercadoPago.js
 var API_MERCADOPAGO = "https://api.mercadopago.com";
-function parametrosPreferencia(orden, origen) {
+function parametrosPreferencia(orden, origen, urlAvisos) {
   const volver = `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`;
   const p = {
     items: [
@@ -366,9 +366,10 @@ function parametrosPreferencia(orden, origen) {
     statement_descriptor: "SOCIUS"
   };
   if (origen.startsWith("https://")) p.auto_return = "approved";
+  if (urlAvisos) p.notification_url = `${urlAvisos}?source_news=webhooks`;
   return p;
 }
-async function crearPreferencia({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
+async function crearPreferencia({ orden, origen, llaveSecreta, urlAvisos, fetch = globalThis.fetch }) {
   const r = await fetch(`${API_MERCADOPAGO}/checkout/preferences`, {
     method: "POST",
     headers: {
@@ -377,7 +378,7 @@ async function crearPreferencia({ orden, origen, llaveSecreta, fetch = globalThi
       // Idempotencia: si el navegador repite la petición, no se crea otra preferencia.
       "X-Idempotency-Key": `preferencia-${orden.id}-${Math.round(Number(orden.totalHoy) * 100)}-${origen}`
     },
-    body: JSON.stringify(parametrosPreferencia(orden, origen))
+    body: JSON.stringify(parametrosPreferencia(orden, origen, urlAvisos))
   });
   const datos = await r.json().catch(() => ({}));
   const url = llaveSecreta?.startsWith("TEST-") ? datos.sandbox_init_point ?? datos.init_point : datos.init_point ?? datos.sandbox_init_point;
@@ -428,7 +429,7 @@ function esPagoReal(pago) {
   if (pago?.pasarela === "mercadopago") return /^\d{6,12}$/.test(id);
   return false;
 }
-async function crearPago({ ordenId, origen, pasarela = "stripe", repo, llaves = {}, origenesPermitidos, fetch }) {
+async function crearPago({ ordenId, origen, pasarela = "stripe", repo, llaves = {}, urlsAvisos = {}, origenesPermitidos, fetch }) {
   try {
     const crear = CREADORES[pasarela];
     if (!crear) throw new ErrorPago("pasarela_sin_pagina", 400);
@@ -440,7 +441,7 @@ async function crearPago({ ordenId, origen, pasarela = "stripe", repo, llaves = 
     if (!orden) throw new ErrorPago("orden_no_encontrada", 404);
     if (orden.estado !== "cotizada") throw new ErrorPago("orden_ya_pagada", 409);
     if (!(orden.totalHoy > 0)) throw new ErrorPago("monto_invalido", 400);
-    const pagina = await crear({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, fetch });
+    const pagina = await crear({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, urlAvisos: urlsAvisos[pasarela], fetch });
     return { status: 200, cuerpo: pagina };
   } catch (e) {
     if (e instanceof ErrorPago) return { status: e.status, cuerpo: { error: e.motivo } };
@@ -876,7 +877,10 @@ function traducirStripe(datos) {
 function traducirMercadoPago(datos) {
   const idPago = datos?.data?.id != null ? String(datos.data.id) : null;
   return {
-    eventoId: String(datos?.id ?? `${datos?.action}:${idPago}`),
+    // Número de aviso + pago: un reenvío del mismo aviso sigue siendo duplicado, pero dos
+    // avisos con el mismo número y distinto pago no chocan (el simulador del panel usa
+    // siempre "id": "123456").
+    eventoId: `${datos?.id ?? datos?.action}:${idPago}`,
     tipo: datos?.type === "payment" && idPago ? TIPOS.CONSULTAR : TIPOS.OTRO,
     idPago,
     referencia: null,

@@ -61,6 +61,9 @@ describe('Pago con la página de Mercado Pago (Sprint 7)', () => {
     expect(p.auto_return).toBeUndefined() // en localhost no; con https sí
     expect(p.payer).toBeUndefined() // un correo real con credenciales de prueba hace fallar el pago
     expect(parametrosPreferencia(orden, 'https://socius.mx').auto_return).toBe('approved')
+    expect(p.notification_url).toBeUndefined()
+    expect(parametrosPreferencia(orden, ORIGEN, 'https://x.supabase.co/functions/v1/webhook-pagos/mercadopago').notification_url)
+      .toBe('https://x.supabase.co/functions/v1/webhook-pagos/mercadopago?source_news=webhooks')
 
     const { fetch, llamadas } = fetchFalso({
       '/checkout/preferences': { cuerpo: { id: 'pref_1', init_point: 'https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=pref_1' } },
@@ -118,5 +121,9 @@ describe('Pago con la página de Mercado Pago (Sprint 7)', () => {
     expect(final.estado).toBe(ESTADOS.REEMBOLSADA)
     expect(final.reembolso).toMatchObject({ estado: 'emitido', tipo: 'devolucion', idReembolso: '9988', monto: 7000 })
     expect((await cola.listar()).every((e) => e.estado === ESTADOS_EVENTO.PROCESADO)).toBe(true)
+
+    // El simulador del panel repite el número de aviso con otro pago: no debe tomarse como duplicado.
+    expect((await avisar(cola, 101, '1325468791')).motivo).toBe('recibido')
+    expect((await avisar(cola, 101, '1325468791')).motivo).toBe('duplicado')
   })
 })
