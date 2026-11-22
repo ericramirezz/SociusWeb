@@ -90,8 +90,14 @@ export class ServicioPedidos {
   async iniciarPagoEnPasarela({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, fechaCliente, ordenId, origen }) {
     if (!this.usaPaginaDePago(pasarela)) throw new Error(`La pasarela ${pasarela} no tiene página de pago conectada`)
     const { orden } = await this.#prepararOrden({ ids, cliente, fechaCliente, ordenId })
-    const { url } = await this.sesionesPago.crear({ ordenId: orden.id, pasarela, origen })
-    return { orden, url }
+    try {
+      const { url } = await this.sesionesPago.crear({ ordenId: orden.id, pasarela, origen })
+      return { orden, url }
+    } catch (e) {
+      // La orden ya existe: el checkout la usa para reintentar sin crear otra.
+      e.orden = orden
+      throw e
+    }
   }
 
   // Crea (o reutiliza, tras un rechazo o una cancelación) la orden cotizada y la guarda.

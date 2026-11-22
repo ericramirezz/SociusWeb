@@ -113,6 +113,7 @@ export default function Checkout() {
       setSeleccionados([])
       navigate('/confirmacion')
     } catch (err) {
+      if (err.orden?.id) setOrdenId(err.orden.id)
       setErrorPago(err.message)
     } finally {
       setLoading(false)

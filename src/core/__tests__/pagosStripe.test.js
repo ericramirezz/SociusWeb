@@ -106,5 +106,13 @@ describe('Pago con la página de Stripe (Sprint 7)', () => {
     expect(pedidas).toEqual([{ ordenId: r1.orden.id, origen: ORIGEN }, { ordenId: r1.orden.id, origen: ORIGEN }])
 
     await expect(servicio.iniciarPagoEnPasarela({ ...datos, pasarela: 'paypal' })).rejects.toThrow(/no tiene página de pago/)
+
+    // Si la función falla (p. ej. sin llave de Stripe), el error trae la orden para reintentar sobre ella.
+    sesionesPago.crear = async () => {
+      throw new Error('sin_llave_stripe')
+    }
+    const fallo = await servicio.iniciarPagoEnPasarela({ ...datos, ordenId: r1.orden.id }).catch((e) => e)
+    expect(fallo.message).toBe('sin_llave_stripe')
+    expect(fallo.orden.id).toBe(r1.orden.id)
   })
 })
