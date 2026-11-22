@@ -11,6 +11,10 @@
 
 export const API_STRIPE = 'https://api.stripe.com/v1'
 
+// ¿El pago lo cobró Stripe de verdad (Checkout) o el SDK simulado?
+// Los PaymentIntent reales traen 24 caracteres después de "pi_"; los simulados, 10.
+export const esPagoStripeReal = (pago) => pago?.pasarela === 'stripe' && /^pi_[A-Za-z0-9]{20,}$/.test(pago?.idTransaccion ?? '')
+
 // Error con el código HTTP que debe responder la Edge Function.
 export class ErrorPago extends Error {
   constructor(motivo, status) {

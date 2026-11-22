@@ -40,6 +40,7 @@ var EVENTOS = Object.freeze({
   AGENDADA: "orden.agendada",
   CANCELADA: "orden.cancelada",
   REEMBOLSADA: "orden.reembolsada",
+  REEMBOLSO_SOLICITADO: "orden.reembolso_solicitado",
   PAGO_RECHAZADO: "pago.rechazado",
   LLAMADA_AGENDADA: "llamada.agendada"
 });
@@ -129,6 +130,12 @@ var RepositorioPedidosSupabase = class {
   }
   async borrar() {
     throw new Error("Las \xF3rdenes no se borran: se cancelan");
+  }
+  // Número de orden a partir del pago (el aviso de reembolso de Stripe solo trae el pago).
+  async ordenPorTransaccion(pasarela, idTransaccion) {
+    const { data, error } = await this.cliente.from("pagos").select("orden_id").eq("pasarela", pasarela).eq("id_transaccion", idTransaccion).maybeSingle();
+    if (error) throw errorDeBase(error, "No se pudo buscar el pago");
+    return data?.orden_id ?? null;
   }
   // Cupo de arranques por día de TODOS los clientes, sin datos personales
   // (función arranques_por_dia de la migración 002). Devuelve { 'YYYY-MM-DD': n }.
@@ -290,6 +297,72 @@ function transicionar(orden, evento, ahora = /* @__PURE__ */ new Date()) {
   };
 }
 
+// src/core/pagos/checkoutStripe.js
+var API_STRIPE = "https://api.stripe.com/v1";
+var esPagoStripeReal = (pago) => pago?.pasarela === "stripe" && /^pi_[A-Za-z0-9]{20,}$/.test(pago?.idTransaccion ?? "");
+var ErrorPago = class extends Error {
+  constructor(motivo, status) {
+    super(motivo);
+    this.motivo = motivo;
+    this.status = status;
+  }
+};
+var aCentavos = (pesos) => Math.round(Number(pesos) * 100);
+function origenPermitido(origen, permitidos) {
+  return typeof origen === "string" && permitidos.map((p) => p.trim().replace(/\/$/, "")).includes(origen.replace(/\/$/, ""));
+}
+function parametrosSesion(orden, origen) {
+  const p = new URLSearchParams({
+    mode: "payment",
+    "line_items[0][quantity]": "1",
+    "line_items[0][price_data][currency]": String(orden.moneda ?? "MXN").toLowerCase(),
+    "line_items[0][price_data][unit_amount]": String(aCentavos(orden.totalHoy)),
+    "line_items[0][price_data][product_data][name]": `Socius \xB7 Orden ${orden.id}`,
+    "line_items[0][price_data][product_data][description]": (orden.partidas ?? []).map((x) => x.nombre).join(", ").slice(0, 500) || "Programas Socius",
+    client_reference_id: orden.id,
+    "metadata[orden_id]": orden.id,
+    "payment_intent_data[metadata][orden_id]": orden.id,
+    success_url: `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`,
+    cancel_url: `${origen}/checkout?cancelado=${encodeURIComponent(orden.id)}`,
+    locale: "es-419"
+  });
+  if (orden.cliente?.email) p.set("customer_email", orden.cliente.email);
+  return p;
+}
+async function crearSesionCheckout({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
+  const cuerpo = parametrosSesion(orden, origen);
+  const r = await fetch(`${API_STRIPE}/checkout/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${llaveSecreta}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      // Idempotencia (Tema 3): si el navegador repite la petición, Stripe devuelve la
+      // misma sesión en lugar de crear otra. Cambia si cambia el monto o el sitio.
+      "Idempotency-Key": `checkout-${orden.id}-${aCentavos(orden.totalHoy)}-${origen}`
+    },
+    body: cuerpo.toString()
+  });
+  const datos = await r.json().catch(() => ({}));
+  if (!r.ok || !datos.url) throw new ErrorPago(datos?.error?.message ?? "stripe_sin_respuesta", 502);
+  return { id: datos.id, url: datos.url };
+}
+async function crearPago({ ordenId, origen, repo, llaveSecreta, origenesPermitidos, fetch }) {
+  try {
+    if (!llaveSecreta) throw new ErrorPago("sin_llave_stripe", 500);
+    if (!origenPermitido(origen, origenesPermitidos)) throw new ErrorPago("origen_no_permitido", 400);
+    if (!ordenId) throw new ErrorPago("sin_orden", 400);
+    const orden = await repo.obtener(ordenId);
+    if (!orden) throw new ErrorPago("orden_no_encontrada", 404);
+    if (orden.estado !== "cotizada") throw new ErrorPago("orden_ya_pagada", 409);
+    if (!(orden.totalHoy > 0)) throw new ErrorPago("monto_invalido", 400);
+    const sesion = await crearSesionCheckout({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, fetch });
+    return { status: 200, cuerpo: sesion };
+  } catch (e) {
+    if (e instanceof ErrorPago) return { status: e.status, cuerpo: { error: e.motivo } };
+    return { status: 500, cuerpo: { error: e.message } };
+  }
+}
+
 // src/core/productos.js
 var Producto = class {
   constructor(datos) {
@@ -322,6 +395,7 @@ function crearProducto(datos) {
 
 // src/core/servicioPedidos.js
 var ACTIVAS = [ESTADOS.AGENDADA, ESTADOS.EN_CURSO];
+var ESTADO_REEMBOLSO = Object.freeze({ SOLICITADO: "solicitado", EMITIDO: "emitido" });
 var ServicioPedidos = class {
   // fuenteOcupacion (opcional): async (desdeISO) => { 'YYYY-MM-DD': arranques }.
   // Con Supabase la da la base (el cliente no ve las órdenes de otros);
@@ -388,8 +462,13 @@ var ServicioPedidos = class {
   async iniciarPagoEnPasarela({ ids, cliente, pasarela = this.config.pasarelaPorDefecto, fechaCliente, ordenId, origen }) {
     if (!this.usaPaginaDePago(pasarela)) throw new Error(`La pasarela ${pasarela} no tiene p\xE1gina de pago conectada`);
     const { orden } = await this.#prepararOrden({ ids, cliente, fechaCliente, ordenId });
-    const { url } = await this.sesionesPago.crear({ ordenId: orden.id, pasarela, origen });
-    return { orden, url };
+    try {
+      const { url } = await this.sesionesPago.crear({ ordenId: orden.id, pasarela, origen });
+      return { orden, url };
+    } catch (e) {
+      e.orden = orden;
+      throw e;
+    }
   }
   // Crea (o reutiliza, tras un rechazo o una cancelación) la orden cotizada y la guarda.
   async #prepararOrden({ ids, cliente, fechaCliente, ordenId }) {
@@ -454,20 +533,55 @@ var ServicioPedidos = class {
     }
     return this.repoPedidos.guardar(orden);
   }
-  // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa.
+  // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa;
+  // si lo cobró Stripe de verdad, se deja la solicitud para Socius (ver reembolsoManual).
   async cancelar(id) {
     let orden = await this.#obtener(id);
     orden = transicionar(orden, "cancelar", this.reloj());
+    if (this.reembolsoManual(orden)) orden = { ...orden, reembolso: this.#solicitud("cancelacion", orden) };
     orden = await this.repoPedidos.guardar(orden);
     this.bus.publicar(EVENTOS.CANCELADA, orden);
-    return orden.pago ? this.#reembolsar(orden) : orden;
+    if (!orden.pago) return orden;
+    if (orden.reembolso?.estado === ESTADO_REEMBOLSO.SOLICITADO) {
+      this.bus.publicar(EVENTOS.REEMBOLSO_SOLICITADO, orden);
+      return orden;
+    }
+    return this.#reembolsar(orden);
   }
   // Devolución: orden en curso o completada.
   async solicitarDevolucion(id) {
-    return this.#reembolsar(await this.#obtener(id));
+    const orden = await this.#obtener(id);
+    if (!this.reembolsoManual(orden)) return this.#reembolsar(orden);
+    if (!this.puedeDevolver(orden)) throw new Error(`La orden ${id} no admite devoluci\xF3n`);
+    const conSolicitud = await this.repoPedidos.guardar({ ...orden, reembolso: this.#solicitud("devolucion", orden) });
+    this.bus.publicar(EVENTOS.REEMBOLSO_SOLICITADO, conSolicitud);
+    return conSolicitud;
+  }
+  // Opción B del Sprint 7: un pago real de Stripe no lo reembolsa la app. El cliente deja
+  // la solicitud, Socius decide y reembolsa desde el panel de Stripe, y el webhook
+  // charge.refunded marca la orden como reembolsada (registrarReembolso).
+  reembolsoManual = (orden) => esPagoStripeReal(orden.pago);
+  #solicitud(tipo, orden) {
+    return { estado: ESTADO_REEMBOLSO.SOLICITADO, tipo, monto: orden.pago.monto, fecha: this.reloj().toISOString() };
+  }
+  // Reembolso confirmado por la pasarela desde su servidor (webhook), venga o no de una solicitud.
+  // Idempotente como confirmarPago: si ya estaba reembolsada, no cambia nada.
+  async registrarReembolso(id, { idReembolso, monto }) {
+    const orden = await this.#obtener(id);
+    if (orden.estado === ESTADOS.REEMBOLSADA) return { aplicado: false, orden };
+    const reembolsada = await this.repoPedidos.guardar({
+      ...transicionar(orden, "reembolsar", this.reloj()),
+      reembolso: { estado: ESTADO_REEMBOLSO.EMITIDO, tipo: orden.reembolso?.tipo ?? "directo", idReembolso: idReembolso ?? null, monto }
+    });
+    this.bus.publicar(EVENTOS.REEMBOLSADA, reembolsada);
+    return { aplicado: true, orden: reembolsada };
+  }
+  // Número de orden a partir del pago (el aviso de reembolso de Stripe solo trae el pago).
+  ordenPorTransaccion(pasarela, idTransaccion) {
+    return this.repoPedidos.ordenPorTransaccion(pasarela, idTransaccion);
   }
   puedeCancelar = (orden) => puede(orden, "cancelar");
-  puedeDevolver = (orden) => Boolean(orden.pago) && puede(orden, "reembolsar") && !puede(orden, "cancelar");
+  puedeDevolver = (orden) => Boolean(orden.pago) && puede(orden, "reembolsar") && !puede(orden, "cancelar") && orden.reembolso?.estado !== ESTADO_REEMBOLSO.SOLICITADO;
   // Lista las órdenes, avanzando las que ya llegaron a su fecha (agendada → en curso → completada).
   async listar() {
     const hoy = aISO(this.reloj());
@@ -496,7 +610,7 @@ var ServicioPedidos = class {
       moneda: orden.moneda
     });
     if (!r.ok) throw new Error("La pasarela no pudo emitir el reembolso");
-    let reembolsada = { ...transicionar(orden, "reembolsar", this.reloj()), reembolso: { idReembolso: r.idReembolso, monto: orden.pago.monto } };
+    let reembolsada = { ...transicionar(orden, "reembolsar", this.reloj()), reembolso: { estado: ESTADO_REEMBOLSO.EMITIDO, idReembolso: r.idReembolso, monto: orden.pago.monto } };
     reembolsada = await this.repoPedidos.guardar(reembolsada);
     this.bus.publicar(EVENTOS.REEMBOLSADA, reembolsada);
     return reembolsada;
@@ -646,11 +760,22 @@ var VERIFICADORES = {
 var TIPOS = Object.freeze({
   APROBADO: "pago_aprobado",
   RECHAZADO: "pago_rechazado",
+  REEMBOLSADO: "pago_reembolsado",
   CONSULTAR: "consultar_pago",
   OTRO: "otro"
 });
 function traducirStripe(datos) {
   const objeto = datos?.data?.object ?? {};
+  if (datos?.type === "charge.refunded") {
+    return {
+      eventoId: datos?.id,
+      tipo: TIPOS.REEMBOLSADO,
+      referencia: objeto.metadata?.orden_id ?? null,
+      idTransaccion: objeto.payment_intent ?? null,
+      idReembolso: objeto.refunds?.data?.[0]?.id ?? null,
+      monto: objeto.amount_refunded != null ? objeto.amount_refunded / 100 : null
+    };
+  }
   const tipo = {
     "payment_intent.succeeded": TIPOS.APROBADO,
     "payment_intent.payment_failed": TIPOS.RECHAZADO
@@ -769,6 +894,12 @@ async function aplicar(evento, servicio, consultores) {
     const pago = await consultar(datos.idPago);
     datos = { ...pago, tipo: pago.estado === "aprobado" ? TIPOS.APROBADO : TIPOS.OTRO };
   }
+  if (datos.tipo === TIPOS.REEMBOLSADO) {
+    const id = datos.referencia ?? await servicio.ordenPorTransaccion(evento.pasarela, datos.idTransaccion);
+    if (!id) throw new Error(`El reembolso del pago ${datos.idTransaccion} no corresponde a ninguna orden`);
+    await servicio.registrarReembolso(id, { idReembolso: datos.idReembolso, monto: datos.monto });
+    return;
+  }
   if (datos.tipo !== TIPOS.APROBADO) return;
   if (!datos.referencia) throw new Error("El aviso no trae el n\xFAmero de orden");
   await servicio.confirmarPago(datos.referencia, {
@@ -776,71 +907,6 @@ async function aplicar(evento, servicio, consultores) {
     idTransaccion: datos.idTransaccion,
     monto: datos.monto
   });
-}
-
-// src/core/pagos/checkoutStripe.js
-var API_STRIPE = "https://api.stripe.com/v1";
-var ErrorPago = class extends Error {
-  constructor(motivo, status) {
-    super(motivo);
-    this.motivo = motivo;
-    this.status = status;
-  }
-};
-var aCentavos = (pesos) => Math.round(Number(pesos) * 100);
-function origenPermitido(origen, permitidos) {
-  return typeof origen === "string" && permitidos.map((p) => p.trim().replace(/\/$/, "")).includes(origen.replace(/\/$/, ""));
-}
-function parametrosSesion(orden, origen) {
-  const p = new URLSearchParams({
-    mode: "payment",
-    "line_items[0][quantity]": "1",
-    "line_items[0][price_data][currency]": String(orden.moneda ?? "MXN").toLowerCase(),
-    "line_items[0][price_data][unit_amount]": String(aCentavos(orden.totalHoy)),
-    "line_items[0][price_data][product_data][name]": `Socius \xB7 Orden ${orden.id}`,
-    "line_items[0][price_data][product_data][description]": (orden.partidas ?? []).map((x) => x.nombre).join(", ").slice(0, 500) || "Programas Socius",
-    client_reference_id: orden.id,
-    "metadata[orden_id]": orden.id,
-    "payment_intent_data[metadata][orden_id]": orden.id,
-    success_url: `${origen}/confirmacion?orden=${encodeURIComponent(orden.id)}`,
-    cancel_url: `${origen}/checkout?cancelado=${encodeURIComponent(orden.id)}`,
-    locale: "es-419"
-  });
-  if (orden.cliente?.email) p.set("customer_email", orden.cliente.email);
-  return p;
-}
-async function crearSesionCheckout({ orden, origen, llaveSecreta, fetch = globalThis.fetch }) {
-  const cuerpo = parametrosSesion(orden, origen);
-  const r = await fetch(`${API_STRIPE}/checkout/sessions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${llaveSecreta}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      // Idempotencia (Tema 3): si el navegador repite la petición, Stripe devuelve la
-      // misma sesión en lugar de crear otra. Cambia si cambia el monto o el sitio.
-      "Idempotency-Key": `checkout-${orden.id}-${aCentavos(orden.totalHoy)}-${origen}`
-    },
-    body: cuerpo.toString()
-  });
-  const datos = await r.json().catch(() => ({}));
-  if (!r.ok || !datos.url) throw new ErrorPago(datos?.error?.message ?? "stripe_sin_respuesta", 502);
-  return { id: datos.id, url: datos.url };
-}
-async function crearPago({ ordenId, origen, repo, llaveSecreta, origenesPermitidos, fetch }) {
-  try {
-    if (!llaveSecreta) throw new ErrorPago("sin_llave_stripe", 500);
-    if (!origenPermitido(origen, origenesPermitidos)) throw new ErrorPago("origen_no_permitido", 400);
-    if (!ordenId) throw new ErrorPago("sin_orden", 400);
-    const orden = await repo.obtener(ordenId);
-    if (!orden) throw new ErrorPago("orden_no_encontrada", 404);
-    if (orden.estado !== "cotizada") throw new ErrorPago("orden_ya_pagada", 409);
-    if (!(orden.totalHoy > 0)) throw new ErrorPago("monto_invalido", 400);
-    const sesion = await crearSesionCheckout({ orden, origen: origen.replace(/\/$/, ""), llaveSecreta, fetch });
-    return { status: 200, cuerpo: sesion };
-  } catch (e) {
-    if (e instanceof ErrorPago) return { status: e.status, cuerpo: { error: e.motivo } };
-    return { status: 500, cuerpo: { error: e.message } };
-  }
 }
 
 // src/core/webhooks/servidor.js

@@ -15,6 +15,10 @@ function siguienteId(lista, prefijo) {
   return `${prefijo}${max + 1}`
 }
 
+// Número de orden a partir de su pago (lo usa el aviso de reembolso de la pasarela).
+const buscarPorTransaccion = (lista, pasarela, idTransaccion) =>
+  lista.find((o) => o.pago?.pasarela === pasarela && o.pago?.idTransaccion === idTransaccion)?.id ?? null
+
 export class RepositorioMemoria {
   #datos = new Map()
   constructor({ prefijoId = 'SOC-' } = {}) {
@@ -30,6 +34,9 @@ export class RepositorioMemoria {
     const conId = entidad.id ? entidad : { ...entidad, id: siguienteId([...this.#datos.values()], this.prefijoId) }
     this.#datos.set(conId.id, conId)
     return conId
+  }
+  async ordenPorTransaccion(pasarela, idTransaccion) {
+    return buscarPorTransaccion(await this.listar(), pasarela, idTransaccion)
   }
   async borrar(id) {
     this.#datos.delete(id)
@@ -66,6 +73,9 @@ export class RepositorioLocalStorage {
     else lista.unshift(conId)
     this.#escribir(lista)
     return conId
+  }
+  async ordenPorTransaccion(pasarela, idTransaccion) {
+    return buscarPorTransaccion(await this.listar(), pasarela, idTransaccion)
   }
   async borrar(id) {
     this.#escribir(this.#leer().filter((x) => x.id !== id))

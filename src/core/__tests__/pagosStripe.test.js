@@ -6,7 +6,11 @@ import { ConfigApp } from '../config'
 import { ESTADOS } from '../estadoOrden'
 import { BusEventos } from '../eventos'
 import { FabricaPasarelas } from '../pagos/fabricaPasarelas'
-import { aCentavos, crearPago, origenPermitido, parametrosSesion } from '../pagos/checkoutStripe'
+import { aCentavos, crearPago, esPagoStripeReal, origenPermitido, parametrosSesion } from '../pagos/checkoutStripe'
+import { ColaEventosMemoria, ESTADOS_EVENTO } from '../webhooks/colaEventos'
+import { firmarStripe } from '../webhooks/firmas'
+import { procesarPendientes } from '../webhooks/procesador'
+import { recibirWebhook } from '../webhooks/receptor'
 import { crearSdks } from '../pagos/sdkSimulados'
 import { RepositorioMemoria } from '../repositorio'
 import { ServicioPedidos } from '../servicioPedidos'
@@ -114,5 +118,63 @@ describe('Pago con la página de Stripe (Sprint 7)', () => {
     const fallo = await servicio.iniciarPagoEnPasarela({ ...datos, ordenId: r1.orden.id }).catch((e) => e)
     expect(fallo.message).toBe('sin_llave_stripe')
     expect(fallo.orden.id).toBe(r1.orden.id)
+  })
+
+  it('CP-46 cancelar un pago real de Stripe deja la solicitud; el reembolso de Socius en Stripe llega por webhook', async () => {
+    const PI = 'pi_3QAbCdEfGhIjKlMnOpQrStUv'
+    const servicio = new ServicioPedidos({
+      repoPedidos: new RepositorioMemoria(), fabricaPasarelas: new FabricaPasarelas(crearSdks(0), () => {}), bus: new BusEventos(),
+      config: ConfigApp.obtener(), catalogo: programas, reloj: () => AHORA,
+      sesionesPago: { soporta: () => true, crear: async () => ({ url: 'https://checkout.stripe.com/x' }) },
+    })
+    const { orden } = await servicio.iniciarPagoEnPasarela({ ids: ['nexus-ia'], cliente, pasarela: 'stripe', fechaCliente: '2026-11-25', origen: ORIGEN })
+    const pagada = (await servicio.confirmarPago(orden.id, { pasarela: 'stripe', idTransaccion: PI, monto: orden.totalHoy })).orden
+    expect(esPagoStripeReal(pagada.pago)).toBe(true)
+    expect(servicio.reembolsoManual(pagada)).toBe(true)
+
+    // El cliente cancela: se libera la fecha, pero la app no reembolsa sola.
+    const cancelada = await servicio.cancelar(orden.id)
+    expect(cancelada.estado).toBe(ESTADOS.CANCELADA)
+    expect(cancelada.reembolso).toMatchObject({ estado: 'solicitado', tipo: 'cancelacion', monto: orden.totalHoy })
+    expect(servicio.puedeDevolver(cancelada)).toBe(false) // no se puede pedir dos veces
+
+    // Socius reembolsa en el panel de Stripe → aviso charge.refunded firmado (solo trae el pago, no la orden).
+    const cola = new ColaEventosMemoria()
+    const cuerpo = JSON.stringify({
+      id: 'evt_reembolso_1', type: 'charge.refunded',
+      data: { object: { id: 'ch_1', payment_intent: PI, amount_refunded: orden.totalHoy * 100, metadata: {}, refunds: { data: [{ id: 're_1' }] } } },
+    })
+    const secretos = { stripe: 'whsec_prueba' }
+    const enviar = async () => recibirWebhook({ pasarela: 'stripe', cuerpo, encabezados: await firmarStripe(cuerpo, 'whsec_prueba', AHORA), secretos, cola, reloj: () => AHORA })
+    expect((await enviar()).motivo).toBe('recibido')
+    expect(await procesarPendientes({ cola, servicio })).toEqual({ procesados: 1, fallidos: 0 })
+
+    const final = await servicio.obtener(orden.id)
+    expect(final.estado).toBe(ESTADOS.REEMBOLSADA)
+    expect(final.reembolso).toMatchObject({ estado: 'emitido', tipo: 'cancelacion', idReembolso: 're_1', monto: orden.totalHoy })
+    expect((await cola.listar())[0].estado).toBe(ESTADOS_EVENTO.PROCESADO)
+    // Si el mismo reembolso se registra otra vez, no cambia nada.
+    expect((await servicio.registrarReembolso(orden.id, { idReembolso: 're_1', monto: orden.totalHoy })).aplicado).toBe(false)
+  })
+
+  it('CP-47 la devolución de un pago real queda como solicitud; un pago simulado se sigue reembolsando solo', async () => {
+    const repo = new RepositorioMemoria()
+    const servicio = new ServicioPedidos({
+      repoPedidos: repo, fabricaPasarelas: new FabricaPasarelas(crearSdks(0), () => {}), bus: new BusEventos(),
+      config: ConfigApp.obtener(), catalogo: programas, reloj: () => AHORA,
+    })
+    const base = { cliente, partidas: [], moneda: 'MXN', totalHoy: 7000, totalContrato: 7000, historial: [] }
+    const real = await repo.guardar({ ...base, estado: ESTADOS.EN_CURSO, pago: { pasarela: 'stripe', idTransaccion: 'pi_3QZyXwVuTsRqPoNmLkJiHgFe', monto: 7000 } })
+    const simulada = await repo.guardar({ ...base, estado: ESTADOS.EN_CURSO, pago: { pasarela: 'stripe', idTransaccion: 'pi_abc123xyz0', monto: 7000 } })
+
+    const r1 = await servicio.solicitarDevolucion(real.id)
+    expect(r1.estado).toBe(ESTADOS.EN_CURSO)
+    expect(r1.reembolso).toMatchObject({ estado: 'solicitado', tipo: 'devolucion' })
+    await expect(servicio.solicitarDevolucion(real.id)).rejects.toThrow(/no admite devolución/)
+
+    const r2 = await servicio.solicitarDevolucion(simulada.id)
+    expect(r2.estado).toBe(ESTADOS.REEMBOLSADA)
+    expect(r2.reembolso.estado).toBe('emitido')
+    expect(await servicio.ordenPorTransaccion('stripe', 'pi_3QZyXwVuTsRqPoNmLkJiHgFe')).toBe(real.id)
   })
 })

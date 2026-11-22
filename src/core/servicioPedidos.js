@@ -13,9 +13,11 @@ import { calendarioServicio, resolverFechaCliente } from './entrega'
 import { ESTADOS, puede, transicionar } from './estadoOrden'
 import { EVENTOS } from './eventos'
 import { aISO, deISO } from './fechas'
+import { esPagoStripeReal } from './pagos/checkoutStripe'
 import { crearProducto } from './productos'
 
 const ACTIVAS = [ESTADOS.AGENDADA, ESTADOS.EN_CURSO]
+export const ESTADO_REEMBOLSO = Object.freeze({ SOLICITADO: 'solicitado', EMITIDO: 'emitido' })
 
 export class ServicioPedidos {
   // fuenteOcupacion (opcional): async (desdeISO) => { 'YYYY-MM-DD': arranques }.
@@ -167,22 +169,62 @@ export class ServicioPedidos {
     return this.repoPedidos.guardar(orden)
   }
 
-  // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa.
+  // Cancelación: antes de que el servicio arranque. Si ya había pago, se reembolsa;
+  // si lo cobró Stripe de verdad, se deja la solicitud para Socius (ver reembolsoManual).
   async cancelar(id) {
     let orden = await this.#obtener(id)
     orden = transicionar(orden, 'cancelar', this.reloj())
+    if (this.reembolsoManual(orden)) orden = { ...orden, reembolso: this.#solicitud('cancelacion', orden) }
     orden = await this.repoPedidos.guardar(orden)
     this.bus.publicar(EVENTOS.CANCELADA, orden)
-    return orden.pago ? this.#reembolsar(orden) : orden
+    if (!orden.pago) return orden
+    if (orden.reembolso?.estado === ESTADO_REEMBOLSO.SOLICITADO) {
+      this.bus.publicar(EVENTOS.REEMBOLSO_SOLICITADO, orden)
+      return orden
+    }
+    return this.#reembolsar(orden)
   }
 
   // Devolución: orden en curso o completada.
   async solicitarDevolucion(id) {
-    return this.#reembolsar(await this.#obtener(id))
+    const orden = await this.#obtener(id)
+    if (!this.reembolsoManual(orden)) return this.#reembolsar(orden)
+    if (!this.puedeDevolver(orden)) throw new Error(`La orden ${id} no admite devolución`)
+    const conSolicitud = await this.repoPedidos.guardar({ ...orden, reembolso: this.#solicitud('devolucion', orden) })
+    this.bus.publicar(EVENTOS.REEMBOLSO_SOLICITADO, conSolicitud)
+    return conSolicitud
+  }
+
+  // Opción B del Sprint 7: un pago real de Stripe no lo reembolsa la app. El cliente deja
+  // la solicitud, Socius decide y reembolsa desde el panel de Stripe, y el webhook
+  // charge.refunded marca la orden como reembolsada (registrarReembolso).
+  reembolsoManual = (orden) => esPagoStripeReal(orden.pago)
+
+  #solicitud(tipo, orden) {
+    return { estado: ESTADO_REEMBOLSO.SOLICITADO, tipo, monto: orden.pago.monto, fecha: this.reloj().toISOString() }
+  }
+
+  // Reembolso confirmado por la pasarela desde su servidor (webhook), venga o no de una solicitud.
+  // Idempotente como confirmarPago: si ya estaba reembolsada, no cambia nada.
+  async registrarReembolso(id, { idReembolso, monto }) {
+    const orden = await this.#obtener(id)
+    if (orden.estado === ESTADOS.REEMBOLSADA) return { aplicado: false, orden }
+    const reembolsada = await this.repoPedidos.guardar({
+      ...transicionar(orden, 'reembolsar', this.reloj()),
+      reembolso: { estado: ESTADO_REEMBOLSO.EMITIDO, tipo: orden.reembolso?.tipo ?? 'directo', idReembolso: idReembolso ?? null, monto },
+    })
+    this.bus.publicar(EVENTOS.REEMBOLSADA, reembolsada)
+    return { aplicado: true, orden: reembolsada }
+  }
+
+  // Número de orden a partir del pago (el aviso de reembolso de Stripe solo trae el pago).
+  ordenPorTransaccion(pasarela, idTransaccion) {
+    return this.repoPedidos.ordenPorTransaccion(pasarela, idTransaccion)
   }
 
   puedeCancelar = (orden) => puede(orden, 'cancelar')
-  puedeDevolver = (orden) => Boolean(orden.pago) && puede(orden, 'reembolsar') && !puede(orden, 'cancelar')
+  puedeDevolver = (orden) =>
+    Boolean(orden.pago) && puede(orden, 'reembolsar') && !puede(orden, 'cancelar') && orden.reembolso?.estado !== ESTADO_REEMBOLSO.SOLICITADO
 
   // Lista las órdenes, avanzando las que ya llegaron a su fecha (agendada → en curso → completada).
   async listar() {
@@ -213,7 +255,7 @@ export class ServicioPedidos {
       idTransaccion: orden.pago.idTransaccion, monto: orden.pago.monto, moneda: orden.moneda,
     })
     if (!r.ok) throw new Error('La pasarela no pudo emitir el reembolso')
-    let reembolsada = { ...transicionar(orden, 'reembolsar', this.reloj()), reembolso: { idReembolso: r.idReembolso, monto: orden.pago.monto } }
+    let reembolsada = { ...transicionar(orden, 'reembolsar', this.reloj()), reembolso: { estado: ESTADO_REEMBOLSO.EMITIDO, idReembolso: r.idReembolso, monto: orden.pago.monto } }
     reembolsada = await this.repoPedidos.guardar(reembolsada)
     this.bus.publicar(EVENTOS.REEMBOLSADA, reembolsada)
     return reembolsada

@@ -7,6 +7,7 @@
 export const TIPOS = Object.freeze({
   APROBADO: 'pago_aprobado',
   RECHAZADO: 'pago_rechazado',
+  REEMBOLSADO: 'pago_reembolsado',
   CONSULTAR: 'consultar_pago',
   OTRO: 'otro',
 })
@@ -14,6 +15,18 @@ export const TIPOS = Object.freeze({
 // Stripe manda el pago completo dentro del aviso; el monto viene en centavos.
 function traducirStripe(datos) {
   const objeto = datos?.data?.object ?? {}
+  // Reembolso hecho por Socius desde el panel de Stripe: el aviso trae el cargo (ch_…),
+  // que apunta al pago (pi_…); con él se encuentra la orden.
+  if (datos?.type === 'charge.refunded') {
+    return {
+      eventoId: datos?.id,
+      tipo: TIPOS.REEMBOLSADO,
+      referencia: objeto.metadata?.orden_id ?? null,
+      idTransaccion: objeto.payment_intent ?? null,
+      idReembolso: objeto.refunds?.data?.[0]?.id ?? null,
+      monto: objeto.amount_refunded != null ? objeto.amount_refunded / 100 : null,
+    }
+  }
   const tipo = {
     'payment_intent.succeeded': TIPOS.APROBADO,
     'payment_intent.payment_failed': TIPOS.RECHAZADO,

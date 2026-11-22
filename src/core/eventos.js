@@ -24,6 +24,7 @@ export const EVENTOS = Object.freeze({
   AGENDADA: 'orden.agendada',
   CANCELADA: 'orden.cancelada',
   REEMBOLSADA: 'orden.reembolsada',
+  REEMBOLSO_SOLICITADO: 'orden.reembolso_solicitado',
   PAGO_RECHAZADO: 'pago.rechazado',
   LLAMADA_AGENDADA: 'llamada.agendada',
 })

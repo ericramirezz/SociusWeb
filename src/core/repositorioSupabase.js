@@ -108,6 +108,18 @@ export class RepositorioPedidosSupabase {
     throw new Error('Las órdenes no se borran: se cancelan')
   }
 
+  // Número de orden a partir del pago (el aviso de reembolso de Stripe solo trae el pago).
+  async ordenPorTransaccion(pasarela, idTransaccion) {
+    const { data, error } = await this.cliente
+      .from('pagos')
+      .select('orden_id')
+      .eq('pasarela', pasarela)
+      .eq('id_transaccion', idTransaccion)
+      .maybeSingle()
+    if (error) throw errorDeBase(error, 'No se pudo buscar el pago')
+    return data?.orden_id ?? null
+  }
+
   // Cupo de arranques por día de TODOS los clientes, sin datos personales
   // (función arranques_por_dia de la migración 002). Devuelve { 'YYYY-MM-DD': n }.
   async arranquesPorDia(desde) {

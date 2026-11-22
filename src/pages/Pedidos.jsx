@@ -81,7 +81,11 @@ function PedidoRow({ pedido, onAccion }) {
                 <Dato titulo={t('pedidos.pago')}>
                   <p className="flex items-center gap-2"><CreditCard size={13} className="text-brand" /> {formatoMoneda(pedido.pago.monto)} MXN {t('pedidos.via')} {pedido.pago.pasarela}</p>
                   <p className="text-slate-500 text-xs font-mono mt-1 break-all">{pedido.pago.idTransaccion}</p>
-                  {pedido.reembolso && <p className="text-amber-800 text-xs mt-1">{t('pedidos.reembolsado')} {formatoMoneda(pedido.reembolso.monto)} MXN</p>}
+                  {pedido.reembolso?.estado === 'solicitado' ? (
+                    <p className="text-amber-800 text-xs mt-1">{t('pedidos.reembolsoSolicitado', { monto: formatoMoneda(pedido.reembolso.monto) })}</p>
+                  ) : pedido.reembolso ? (
+                    <p className="text-amber-800 text-xs mt-1">{t('pedidos.reembolsado')} {formatoMoneda(pedido.reembolso.monto)} MXN</p>
+                  ) : null}
                 </Dato>
               )}
               <Dato titulo={t('pedidos.cliente')}>
@@ -131,13 +135,17 @@ function PedidoRow({ pedido, onAccion }) {
 // Textos de los diálogos de confirmación (claves en pedidos.modal del diccionario).
 const ACCIONES = {
   cancelar: {
-    cuerpo: (t, p) => p.pago
-      ? t('pedidos.modal.cancelar.conPago', { id: p.id, monto: formatoMoneda(p.pago.monto) })
-      : t('pedidos.modal.cancelar.sinPago', { id: p.id }),
+    cuerpo: (t, p) => !p.pago
+      ? t('pedidos.modal.cancelar.sinPago', { id: p.id })
+      : servicio.reembolsoManual(p)
+        ? t('pedidos.modal.cancelar.conSolicitud', { id: p.id, monto: formatoMoneda(p.pago.monto) })
+        : t('pedidos.modal.cancelar.conPago', { id: p.id, monto: formatoMoneda(p.pago.monto) }),
     ejecutar: (id) => servicio.cancelar(id),
   },
   devolver: {
-    cuerpo: (t, p) => t('pedidos.modal.devolver.cuerpo', { id: p.id, monto: formatoMoneda(p.pago.monto) }),
+    cuerpo: (t, p) => servicio.reembolsoManual(p)
+      ? t('pedidos.modal.devolver.conSolicitud', { id: p.id, monto: formatoMoneda(p.pago.monto) })
+      : t('pedidos.modal.devolver.cuerpo', { id: p.id, monto: formatoMoneda(p.pago.monto) }),
     ejecutar: (id) => servicio.solicitarDevolucion(id),
   },
 }

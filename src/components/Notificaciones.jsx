@@ -11,6 +11,7 @@ const MENSAJES = {
   [EVENTOS.AGENDADA]: (o, t, fecha) => ({ tipo: 'info', texto: t('notif.agendada', { fecha: fecha(o.fechaArranque) }) }),
   [EVENTOS.CANCELADA]: (o, t) => ({ tipo: 'info', texto: t('notif.cancelada', { id: o.id }) }),
   [EVENTOS.REEMBOLSADA]: (o, t) => ({ tipo: 'ok', texto: t('notif.reembolsada', { id: o.id }) }),
+  [EVENTOS.REEMBOLSO_SOLICITADO]: (o, t) => ({ tipo: 'info', texto: t('notif.reembolsoSolicitado', { id: o.id }) }),
   [EVENTOS.PAGO_RECHAZADO]: (_, t) => ({ tipo: 'error', texto: t('notif.rechazado') }),
   [EVENTOS.LLAMADA_AGENDADA]: (l, t, fecha) => ({ tipo: 'ok', texto: t('notif.llamada', { fecha: fecha(l.fecha), hora: l.hora }) }),
 }

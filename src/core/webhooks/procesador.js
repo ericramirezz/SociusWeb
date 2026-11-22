@@ -32,6 +32,13 @@ async function aplicar(evento, servicio, consultores) {
     datos = { ...pago, tipo: pago.estado === 'aprobado' ? TIPOS.APROBADO : TIPOS.OTRO }
   }
 
+  if (datos.tipo === TIPOS.REEMBOLSADO) {
+    const id = datos.referencia ?? (await servicio.ordenPorTransaccion(evento.pasarela, datos.idTransaccion))
+    if (!id) throw new Error(`El reembolso del pago ${datos.idTransaccion} no corresponde a ninguna orden`)
+    await servicio.registrarReembolso(id, { idReembolso: datos.idReembolso, monto: datos.monto })
+    return
+  }
+
   // Rechazos y otros avisos solo quedan registrados: la orden sigue cotizada y el cliente puede reintentar.
   if (datos.tipo !== TIPOS.APROBADO) return
   if (!datos.referencia) throw new Error('El aviso no trae el número de orden')

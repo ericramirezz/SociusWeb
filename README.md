@@ -7,7 +7,7 @@ Aplicación web para Socius Real Estate Consulting: catálogo con precios, cotiz
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # 47 casos de prueba (Vitest)
+npm test           # 49 casos de prueba (Vitest)
 npm run build      # versión de producción en dist/
 npm run build:funciones   # empaqueta src/core para las Edge Functions (supabase/functions/_shared/)
 npm run simular:webhook -- --url … --secreto … --orden SOC-… --monto …   # manda un aviso de pago firmado
@@ -54,7 +54,7 @@ src/
       adaptadores.js        Adapter: un contrato cobrar()/reembolsar() para los tres
       decoradores.js        Decorator: bitácora, idempotencia, reintento
       fabricaPasarelas.js   Factory Method con registro
-    __tests__/          Pruebas unitarias (CP-01 a CP-22), webhooks (CP-37 a CP-41) y Stripe (CP-42 a CP-45)
+    __tests__/          Pruebas unitarias (CP-01 a CP-22), webhooks (CP-37 a CP-41) y Stripe (CP-42 a CP-47)
   __tests__/            Pruebas de interfaz e integración con Supabase falso (CP-23 a CP-36)
   sesion/               SesionContext (useSesion): usuario actual para las pantallas
   i18n/                 Idiomas: IdiomaContext (useIdioma, t), es.js, en.js
@@ -125,6 +125,16 @@ npx supabase functions deploy crear-pago --no-verify-jwt --use-api   # la sesió
 - Stripe → Desarrolladores → Webhooks: destino `https://<ref>.supabase.co/functions/v1/webhook-pagos/stripe` con los eventos `payment_intent.succeeded` y `payment_intent.payment_failed`; su secreto `whsec_…` va en `STRIPE_WEBHOOK_SECRET` (reemplaza el de prueba del simulador).
 - Sitio publicado: agregar su dirección a `ORIGENES_PERMITIDOS` (secreto, separado por comas; por defecto `http://localhost:5173`).
 
+### Reembolsos de pagos reales de Stripe (solicitud + Socius)
+
+Un pago real de Stripe no lo reembolsa la app (`ServicioPedidos.reembolsoManual`):
+
+1. El cliente cancela (antes del arranque: la orden queda *cancelada* y se libera la fecha) o pide devolución (en curso o completada). La orden guarda `reembolso = { estado: 'solicitado', tipo, monto }` y "Mis pedidos" lo muestra.
+2. Socius revisa la solicitud y, si procede, reembolsa desde el panel de Stripe (Pagos → el pago → Reembolsar), por el monto que decida.
+3. Stripe manda `charge.refunded` firmado a `webhook-pagos`; el consumidor encuentra la orden por el pago (`pi_…` en la tabla `pagos`) y la marca *reembolsada* con `reembolso.estado = 'emitido'`. Un reembolso hecho sin solicitud también se registra.
+
+Los pagos simulados (Mercado Pago, PayPal y los de Stripe del simulador) se siguen reembolsando solos. En Stripe, el webhook debe escuchar también `charge.refunded`.
+
 ## Idiomas
 
 Español (Latinoamérica) e English (US), con el ícono de mundo del menú. La elección se guarda en el navegador.
@@ -181,6 +191,6 @@ Blanco y azules. Tokens en `tailwind.config.js`: `brand` (#1D4ED8), `brand-dark`
 ## Pendiente
 
 1. Integración real en modo prueba de Mercado Pago y PayPal (Stripe ya está): consultar el pago de Mercado Pago, verificar avisos de PayPal y, con las tres reales, quitar las políticas TEMPORAL de la migración 001.
-2. Reembolsos reales de Stripe: hoy cancelar/devolver usa el adaptador simulado.
+2. Panel de Socius para ver las solicitudes de reembolso (función 7 del backlog); mientras, se revisan en Supabase (`ordenes.reembolso->>estado = 'solicitado'`).
 3. Correo propio (SMTP) para el enlace de acceso antes de la demo.
 4. Documento final, presentación con mockup, diagrama de contexto y demo.
