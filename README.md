@@ -205,7 +205,7 @@ Blanco y azules. Tokens en `tailwind.config.js`: `brand` (#1D4ED8), `brand-dark`
 
 ## Pendiente
 
-1. Integración real en modo prueba de PayPal (Stripe y Mercado Pago ya están): verificar sus avisos por API y, con las tres reales, quitar las políticas TEMPORAL de la migración 001.
+1. Correr la migración 004 (quita las políticas TEMPORAL de la 001: solo el servidor marca pagos y reembolsos). Stripe, Mercado Pago y PayPal ya cobran y reembolsan en modo prueba.
 2. Panel de Socius para ver las solicitudes de reembolso (función 7 del backlog); mientras, se revisan en Supabase (`ordenes.reembolso->>estado = 'solicitado'`).
 3. Correo propio (SMTP) para el enlace de acceso antes de la demo.
 4. Documento final, presentación con mockup, diagrama de contexto y demo.
