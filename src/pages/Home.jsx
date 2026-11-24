@@ -1,355 +1,276 @@
-import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronDown, Zap, Target, TrendingUp, Building2, Clock, Award, BadgeDollarSign, Gauge, CheckCircle2, GraduationCap } from 'lucide-react'
+import { Check, GraduationCap } from 'lucide-react'
 import { programas } from '../data/programas'
 import ProgramaCard from '../components/ProgramaCard'
 import PreguntasFrecuentes from '../components/PreguntasFrecuentes'
+import CompresionTiempo from '../components/CompresionTiempo'
+import { EncabezadoSeccion, Etiqueta } from '../components/Lamina'
+import { boton, contenedor } from '../components/estilos'
 import { useIdioma } from '../i18n/IdiomaContext'
 
-function useCountUp(end, duration = 2000, start = false) {
-  const [count, setCount] = useState(0)
-  useEffect(() => {
-    if (!start) return
-    let startTime = null
-    const step = (timestamp) => {
-      if (!startTime) startTime = timestamp
-      const progress = Math.min((timestamp - startTime) / duration, 1)
-      setCount(Math.floor(progress * end))
-      if (progress < 1) requestAnimationFrame(step)
-    }
-    requestAnimationFrame(step)
-  }, [end, duration, start])
-  return count
-}
+// Desarrollos y brokers que han trabajado con Socius (de sociusrealestate.com).
+const CLIENTES = ['Terraviva', 'Vivenza', 'Global Inmuebles', 'We Santa Fe', 'Sahai', 'Riga Bosques', 'Coldwell Banker', 'Urbano Town']
 
-function MetricCard({ icon: Icon, value, prefix = '', suffix, label, start }) {
-  const count = useCountUp(value, 2000, start)
-  const { locale } = useIdioma()
+// Tres niveles de involucramiento = tres edificios: entre más hace Socius, más alto.
+const TORRES = [
+  { alto: 'h-40 md:h-72', estilo: 'bg-negro text-white pisos', nota: 'text-violeta' },
+  { alto: 'h-32 md:h-56', estilo: 'bg-violeta text-white pisos', nota: 'text-violeta' },
+  // Nexus IA: solo la capa de IA, en cian (el acento de IA de la marca).
+  { alto: 'h-24 md:h-40', estilo: 'bg-cian text-negro pisos-oscuros', nota: 'text-violeta' },
+]
+
+// Contenido alineado a la columna de lectura del encabezado (columnas 4 a 12).
+function Columna({ children, className = '' }) {
   return (
-    <div className="text-center p-6">
-      <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-brand/10 flex items-center justify-center">
-        <Icon size={22} className="text-brand" />
-      </div>
-      <div className="text-4xl font-black text-navy mb-1">
-        {prefix}{count.toLocaleString(locale)}{suffix}
-      </div>
-      <div className="text-slate-600 text-sm max-w-[14rem] mx-auto">{label}</div>
+    <div className="lg:grid lg:grid-cols-12 lg:gap-x-8">
+      <div className={`lg:col-span-9 lg:col-start-4 ${className}`}>{children}</div>
     </div>
   )
 }
 
-const ICONOS_PILARES = [Zap, Target, TrendingUp]
-// Desarrollos y brokers que han trabajado con Socius (de sociusrealestate.com).
-const CLIENTES = ['Terraviva', 'Vivenza', 'Global Inmuebles', 'We Santa Fe', 'Sahai', 'Riga Bosques', 'Coldwell Banker', 'Urbano Town']
-
 export default function Home() {
-  const metricsRef = useRef(null)
-  const [metricsVisible, setMetricsVisible] = useState(false)
-  const { t } = useIdioma()
+  const { t, locale } = useIdioma()
+  const numero = (n) => n.toLocaleString(locale)
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setMetricsVisible(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.3 }
-    )
-    if (metricsRef.current) observer.observe(metricsRef.current)
-    return () => observer.disconnect()
-  }, [])
+  // Cifras: el número manda; la unidad va más chica, como en una ficha técnica.
+  const metricas = [
+    { valor: `+${numero(250)}`, texto: t('home.metricas.negocios') },
+    { valor: `$${numero(2500)}`, unidad: t('home.metricas.mdp'), texto: t('home.metricas.ventas') },
+    { valor: numero(4), unidad: t('home.metricas.meses'), texto: t('home.metricas.promedio') },
+    { valor: `${numero(21)}×`, texto: t('home.metricas.calificacion') },
+  ]
 
   return (
     <div className="bg-white">
-      {/* HERO */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-28 pb-24 overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white via-brand-soft to-white" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(29,78,216,0.08)_0%,_transparent_60%)]" />
+      {/* HERO: la promesa y su dibujo */}
+      <section className="pt-28 sm:pt-40">
+        <div className={contenedor}>
+          <Etiqueta>{t('home.insignia')}</Etiqueta>
 
-        {/* Grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(11,31,58,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(11,31,58,0.6) 1px, transparent 1px)',
-            backgroundSize: '60px 60px',
-          }}
-        />
-
-        {/* Content */}
-        <div className="relative z-10 max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 text-brand text-xs font-medium tracking-widest uppercase px-4 py-2 rounded-full mb-8">
-            <Award size={12} />
-            {t('home.insignia')}
-          </div>
-
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-black leading-[1.05] tracking-tight mb-6">
+          <h1 className="titular mt-6 text-[clamp(2.1rem,5.4vw,4.75rem)] leading-[1.0] text-negro">
             {[t('home.titulo1'), t('home.titulo2')].filter(Boolean).map((linea) => (
-              <span key={linea} className="block text-navy">{linea}</span>
+              <span key={linea} className="block">
+                {linea}
+              </span>
             ))}
-            <span className="block text-brand">{t('home.titulo3')}</span>
+            {/* El mismo azul de los bloques apilados: "cuatro meses" es lo que dibuja la gráfica. */}
+            <span className="block text-violeta">{t('home.titulo3')}</span>
           </h1>
 
-          <p className="text-slate-700 text-lg sm:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-            {t('home.subtitulo')}
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              to="/agenda"
-              className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-8 py-4 rounded-xl text-base transition-all duration-200 shadow-lg shadow-brand/20 hover:shadow-brand/30 hover:scale-105"
-            >
-              {t('comun.agendarLlamadaEstrategica')}
-              <ArrowRight size={18} />
-            </Link>
-            <Link
-              to="/catalogo"
-              className="flex items-center gap-2 border border-slate-300 hover:border-slate-400 text-navy font-semibold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:bg-slate-100"
-            >
-              {t('home.verProgramas')}
-            </Link>
-          </div>
-
-          {/* Trust logos */}
-          <div className="mt-16 flex flex-col items-center gap-4">
-            <p className="text-slate-400 text-xs uppercase tracking-widest">{t('home.clientes')}</p>
-            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 max-w-2xl">
-              {CLIENTES.map((brand) => (
-                <span key={brand} className="text-slate-500 text-sm font-semibold tracking-wider hover:text-slate-600 transition-colors">
-                  {brand}
-                </span>
-              ))}
+          <div className="mt-12 grid items-end gap-x-8 gap-y-14 lg:mt-16 lg:grid-cols-12">
+            <div className="lg:col-span-5">
+              <p className="max-w-md text-lg leading-relaxed text-negro/70 sm:text-xl">{t('home.subtitulo')}</p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to="/agenda" className={boton.primario}>
+                  {t('comun.agendarLlamadaEstrategica')}
+                </Link>
+                <Link to="/catalogo" className={boton.secundario}>
+                  {t('home.verProgramas')}
+                </Link>
+              </div>
+            </div>
+            <div className="lg:col-span-6 lg:col-start-7">
+              <CompresionTiempo />
             </div>
           </div>
-        </div>
 
-        {/* Scroll indicator */}
-        <div className="hidden sm:block absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce text-slate-400">
-          <ChevronDown size={24} />
+          {/* Clientes */}
+          <div className="mt-20 grid gap-y-4 border-t border-negro/10 py-8 lg:mt-24 lg:grid-cols-12 lg:gap-x-8">
+            <p className="text-sm font-medium text-negro/60 lg:col-span-3">{t('home.clientes')}</p>
+            <ul className="flex flex-wrap gap-x-8 gap-y-3 lg:col-span-9">
+              {CLIENTES.map((marca) => (
+                <li key={marca} className="text-[15px] font-semibold tracking-subtitular text-negro/70">
+                  {marca}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 
       {/* DIAGNÓSTICO: el problema que resuelve Socius */}
-      <section className="py-24 px-4 bg-slate-50 border-y border-slate-200">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.diagnostico.etiqueta')}</span>
-            <h2 className="text-4xl sm:text-5xl font-black text-navy leading-tight">
-              {t('home.diagnostico.titulo1')}<br />
-              <span className="text-brand">{t('home.diagnostico.titulo2')}</span>
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {t('home.diagnostico.problemas').map(({ titulo, desc }, i) => (
-              <div key={titulo} className="p-6 rounded-2xl bg-white border border-slate-200">
-                <span className="text-brand/30 text-4xl font-black">{String(i + 1).padStart(2, '0')}</span>
-                <h3 className="text-navy font-bold text-lg mt-2 mb-2">{titulo}</h3>
-                <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="text-center mt-12 max-w-2xl mx-auto">
-            <p className="text-navy text-xl font-bold mb-2">{t('home.diagnostico.cierre1')}</p>
-            <p className="text-slate-700 text-lg">{t('home.diagnostico.cierre2')}</p>
-          </div>
+      <section className="bg-negro py-24 text-white sm:py-32">
+        <div className={contenedor}>
+          <EncabezadoSeccion oscuro etiqueta={t('home.diagnostico.etiqueta')} titulo={[t('home.diagnostico.titulo1'), t('home.diagnostico.titulo2')]} />
+          <Columna className="mt-16">
+            <ul className="grid gap-10 md:grid-cols-3 md:gap-8">
+              {t('home.diagnostico.problemas').map(({ titulo, desc }) => (
+                <li key={titulo} className="border-t border-white/20 pt-5">
+                  <h3 className="text-lg font-bold">{titulo}</h3>
+                  <p className="mt-2 leading-relaxed text-white/70">{desc}</p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-20 max-w-2xl">
+              <p className="text-2xl font-bold tracking-subtitular sm:text-3xl">{t('home.diagnostico.cierre1')}</p>
+              <p className="mt-3 text-lg leading-relaxed text-white/70">{t('home.diagnostico.cierre2')}</p>
+            </div>
+          </Columna>
         </div>
       </section>
 
-      {/* CÓMO FUNCIONA LA MÁQUINA */}
-      <section className="py-24 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div>
-              <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-4 block">
-                {t('home.queEs')}
-              </span>
-              <h2 className="text-4xl sm:text-5xl font-black text-navy leading-tight mb-6">
-                {t('home.queEsTitulo1')}<br />
-                <span className="text-brand">{t('home.queEsTitulo2')}</span>
-              </h2>
-              <p className="text-slate-700 text-lg leading-relaxed mb-6">
-                {t('home.queEsP1')}
-              </p>
-              <p className="text-navy text-base font-semibold">
-                {t('home.queEsP2')}
-              </p>
-              <Link
-                to="/agenda"
-                className="inline-flex items-center gap-2 mt-8 text-brand font-semibold hover:gap-3 transition-all duration-200"
-              >
-                {t('comun.hablarEstratega')}
-                <ArrowRight size={16} />
-              </Link>
-            </div>
+      {/* CÓMO FUNCIONA LA MÁQUINA: tres etapas en orden */}
+      <section className="py-24 sm:py-32">
+        <div className={contenedor}>
+          <EncabezadoSeccion etiqueta={t('home.queEs')} titulo={[t('home.queEsTitulo1'), t('home.queEsTitulo2')]}>
+            <p className="mt-8 max-w-2xl text-lg leading-relaxed text-negro/70 sm:text-xl">{t('home.queEsP1')}</p>
+            <p className="mt-4 font-semibold text-negro">{t('home.queEsP2')}</p>
+            <Link to="/agenda" className={`${boton.texto} mt-8`}>
+              {t('comun.hablarEstratega')}
+            </Link>
+          </EncabezadoSeccion>
 
-            <div className="space-y-4">
-              {t('home.pilares').map(({ titulo, desc, metrica }, i) => {
-                const Icon = ICONOS_PILARES[i]
+          <Columna className="mt-16">
+            <ol className="grid gap-0 md:grid-cols-3 md:gap-8">
+              {t('home.pilares').map(({ titulo, desc, metrica }, i, lista) => (
+                <li key={titulo} className="relative flex gap-5 pb-10 md:block md:pb-0">
+                  {/* Conector: vertical en móvil, horizontal en escritorio */}
+                  {i < lista.length - 1 && (
+                    <>
+                      <span aria-hidden="true" className="absolute bottom-0 left-5 top-11 w-px bg-violeta/25 md:hidden" />
+                      <span aria-hidden="true" className="absolute left-12 right-0 top-5 hidden h-px bg-violeta/25 md:block" />
+                    </>
+                  )}
+                  <span className="relative z-10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border-2 border-violeta bg-white text-sm font-bold text-violeta">
+                    {i + 1}
+                  </span>
+                  <div className="md:mt-6">
+                    <h3 className="text-lg font-bold leading-snug text-negro">{titulo}</h3>
+                    <p className="mt-2 leading-relaxed text-negro/70">{desc}</p>
+                    <p className="mt-4 border-t border-violeta/20 pt-3 text-sm font-semibold leading-snug text-violeta">{metrica}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Columna>
+        </div>
+      </section>
+
+      {/* MÉTRICAS: una ficha técnica de resultados */}
+      <section className="bg-lavanda py-24 sm:py-32">
+        <div className={contenedor}>
+          <EncabezadoSeccion etiqueta={t('home.resultados')} titulo={t('home.resultadosTitulo')} tamano="medio" />
+          <dl className="mt-14">
+            {metricas.map(({ valor, unidad, texto }) => (
+              <div key={texto} className="grid items-baseline gap-x-8 gap-y-1 border-t border-violeta/15 py-6 sm:grid-cols-2 lg:grid-cols-12 lg:py-8">
+                <dt className="order-2 max-w-sm text-base leading-snug text-negro/70 sm:text-lg lg:col-span-4 lg:col-start-9">{texto}</dt>
+                <dd className="cifra order-1 text-[clamp(3rem,7vw,5.5rem)] leading-none text-negro lg:col-span-5 lg:col-start-4">
+                  {valor}
+                  {unidad && <span className="ml-2 text-[0.4em] font-bold text-violeta">{unidad.trim()}</span>}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* NIVELES DE INVOLUCRAMIENTO: tres edificios de distinta altura */}
+      <section className="py-24 sm:py-32">
+        <div className={contenedor}>
+          <EncabezadoSeccion etiqueta={t('home.niveles.etiqueta')} titulo={[t('home.niveles.titulo1'), t('home.niveles.titulo2')]} sub={t('home.niveles.sub')} />
+          <Columna className="mt-16">
+            <ul className="grid gap-12 md:grid-cols-3 md:gap-6">
+              {t('home.niveles.items').map(({ modo, nombre, desc, nota }, i) => {
+                const torre = TORRES[i] ?? TORRES.at(-1)
                 return (
-                <div
-                  key={titulo}
-                  className="flex items-start gap-5 p-5 rounded-xl border border-slate-200 bg-slate-50 hover:border-brand/20 hover:bg-brand/3 transition-all duration-300"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
-                    <Icon size={18} className="text-brand" />
-                  </div>
-                  <div>
-                    <h3 className="text-navy font-bold text-base mb-1">{titulo}</h3>
-                    <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
-                    <p className="mt-2 text-brand text-xs font-semibold">{metrica}</p>
-                  </div>
-                </div>
+                  <li key={nombre} className="flex flex-col">
+                    <div className="flex flex-col justify-end md:h-72">
+                      <div className={`flex flex-col justify-between rounded-t-md p-5 ${torre.alto} ${torre.estilo}`}>
+                        <p className="text-sm font-medium opacity-80">{modo}</p>
+                        <h3 className="titular text-2xl sm:text-[1.75rem]">{nombre}</h3>
+                      </div>
+                    </div>
+                    <div className="border-t-2 border-negro pt-5">
+                      <p className="leading-relaxed text-negro/70">{desc}</p>
+                      <p className="mt-4 flex items-start gap-2 text-sm font-semibold text-negro">
+                        <Check size={16} aria-hidden="true" className={`mt-0.5 flex-shrink-0 ${torre.nota}`} />
+                        {nota}
+                      </p>
+                    </div>
+                  </li>
                 )
               })}
-            </div>
-          </div>
-        </div>
-      </section>
+            </ul>
 
-      {/* MÉTRICAS */}
-      <section ref={metricsRef} className="py-20 px-4 border-y border-slate-200 bg-slate-50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.resultados')}</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy">{t('home.resultadosTitulo')}</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 divide-x-0 md:divide-x divide-slate-200">
-            <MetricCard icon={Building2} value={250} prefix="+" suffix="" label={t('home.metricas.negocios')} start={metricsVisible} />
-            <MetricCard icon={BadgeDollarSign} value={2500} prefix="$" suffix={t('home.metricas.mdp')} label={t('home.metricas.ventas')} start={metricsVisible} />
-            <MetricCard icon={Clock} value={4} suffix={t('home.metricas.meses')} label={t('home.metricas.promedio')} start={metricsVisible} />
-            <MetricCard icon={Gauge} value={21} suffix="×" label={t('home.metricas.calificacion')} start={metricsVisible} />
-          </div>
-        </div>
-      </section>
-
-      {/* NIVELES DE INVOLUCRAMIENTO */}
-      <section className="py-24 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.niveles.etiqueta')}</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy mb-4">
-              {t('home.niveles.titulo1')} <span className="text-brand">{t('home.niveles.titulo2')}</span>
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">{t('home.niveles.sub')}</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {t('home.niveles.items').map(({ modo, nombre, desc, nota }) => (
-              <div key={nombre} className="flex flex-col p-6 rounded-2xl border border-slate-200 hover:border-brand/30 transition-colors">
-                <span className="text-brand text-xs font-semibold uppercase tracking-widest">{modo}</span>
-                <h3 className="text-navy text-2xl font-black mt-2 mb-3">{nombre}</h3>
-                <p className="text-slate-600 text-sm leading-relaxed flex-1">{desc}</p>
-                <p className="mt-4 flex items-center gap-2 text-slate-700 text-xs font-medium">
-                  <CheckCircle2 size={14} className="text-brand" />
-                  {nota}
-                </p>
+            <div className="mt-16 flex flex-col gap-6 rounded-md bg-lavanda p-6 sm:p-8 md:flex-row md:items-center">
+              <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-white text-violeta">
+                <GraduationCap size={22} aria-hidden="true" />
+              </span>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-negro">{t('home.niveles.aviTitulo')}</h3>
+                <p className="mt-1 max-w-2xl leading-relaxed text-negro/70">{t('home.niveles.aviTexto')}</p>
               </div>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-col md:flex-row md:items-center gap-5 p-6 rounded-2xl bg-brand-soft border border-brand/20">
-            <div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0">
-              <GraduationCap size={22} className="text-brand" />
+              <Link to="/catalogo" className={`${boton.chico} self-start md:self-center`}>
+                {t('home.niveles.aviCta')}
+              </Link>
             </div>
-            <div className="flex-1">
-              <h3 className="text-navy font-bold text-lg">{t('home.niveles.aviTitulo')}</h3>
-              <p className="text-slate-700 text-sm leading-relaxed">{t('home.niveles.aviTexto')}</p>
-            </div>
-            <Link
-              to="/catalogo"
-              className="inline-flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-semibold text-sm px-5 py-3 rounded-lg transition-colors"
-            >
-              {t('home.niveles.aviCta')}
-              <ArrowRight size={15} />
-            </Link>
-          </div>
+          </Columna>
         </div>
       </section>
 
-      {/* MÉTODO SOCIUS */}
-      <section className="py-24 px-4 bg-slate-50 border-y border-slate-200">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.metodo.etiqueta')}</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy">
-              {t('home.metodo.titulo1')} <span className="text-brand">{t('home.metodo.titulo2')}</span>
-            </h2>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {t('home.metodo.pasos').map(({ letra, titulo, desc }) => (
-              <div key={titulo} className="flex items-start gap-4 p-5 rounded-xl bg-white border border-slate-200">
-                <span aria-hidden="true" className="w-12 h-12 rounded-xl bg-brand text-white text-2xl font-black flex items-center justify-center flex-shrink-0">
+      {/* MÉTODO SOCIUS: las seis iniciales deletrean la marca */}
+      <section className="bg-lavanda py-24 sm:py-32">
+        <div className={contenedor}>
+          <EncabezadoSeccion etiqueta={t('home.metodo.etiqueta')} titulo={[t('home.metodo.titulo1'), t('home.metodo.titulo2')]} />
+          <ol className="mt-16 grid border-t border-violeta/15 sm:grid-cols-2 lg:grid-cols-6">
+            {t('home.metodo.pasos').map(({ letra, titulo, desc }, i) => (
+              <li
+                key={titulo}
+                className={`flex gap-5 border-b border-violeta/15 py-6 lg:block lg:border-b-0 lg:border-l lg:px-5 lg:py-8 lg:first:border-l-0 lg:first:pl-0 ${
+                  i % 2 === 1 ? 'sm:border-l sm:pl-5' : 'sm:pr-5'
+                }`}
+              >
+                <span aria-hidden="true" className="w-14 flex-shrink-0 font-display text-6xl font-bold leading-[0.8] text-violeta lg:block lg:w-auto lg:text-[clamp(5rem,8vw,7.5rem)]">
                   {letra}
                 </span>
-                <div>
-                  <h3 className="text-navy font-bold text-base mb-1">{titulo}</h3>
-                  <p className="text-slate-600 text-sm leading-relaxed">{desc}</p>
+                <div className="lg:mt-8">
+                  <h3 className="font-bold leading-snug text-negro">{titulo}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-negro/70">{desc}</p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
-      {/* PROGRAMAS */}
-      <section className="py-24 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('home.programas')}</span>
-            <h2 className="text-3xl sm:text-4xl font-black text-navy mb-4">{t('home.programasTitulo')}</h2>
-            <p className="text-slate-600 max-w-xl mx-auto">{t('home.programasSub')}</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      {/* PROGRAMAS: lista de precios */}
+      <section className="py-24 sm:py-32">
+        <div className={contenedor}>
+          <EncabezadoSeccion etiqueta={t('home.programas')} titulo={t('home.programasTitulo')} sub={t('home.programasSub')} tamano="medio" />
+          <ul className="mt-14 border-t border-negro/10">
             {programas.map((p) => (
               <ProgramaCard key={p.id} programa={p} modo="catalogo" />
             ))}
-          </div>
-
-          <div className="text-center mt-10">
-            <Link
-              to="/catalogo"
-              className="inline-flex items-center gap-2 border border-slate-200 hover:border-brand/40 text-slate-700 hover:text-brand text-sm font-medium px-6 py-3 rounded-lg transition-all duration-200"
-            >
+          </ul>
+          <div className="mt-10 lg:grid lg:grid-cols-12 lg:gap-x-8">
+            <Link to="/catalogo" className={`${boton.texto} lg:col-span-9 lg:col-start-4`}>
               {t('home.verComparativa')}
-              <ArrowRight size={15} />
             </Link>
           </div>
         </div>
       </section>
 
-      {/* CTA FINAL */}
-      <section className="py-24 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="relative p-12 rounded-3xl border border-brand/20 bg-gradient-to-b from-brand/5 to-transparent overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(29,78,216,0.08)_0%,_transparent_70%)]" />
-            <div className="relative z-10">
-              <h2 className="text-4xl sm:text-5xl font-black text-navy mb-4 leading-tight">
-                {t('home.ctaTitulo1')}<br />
-                <span className="text-brand">{t('home.ctaTitulo2')}</span>
-              </h2>
-              <p className="text-slate-700 text-lg mb-10 max-w-xl mx-auto">
-                {t('home.ctaTexto')}
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  to="/agenda"
-                  className="flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-8 py-4 rounded-xl text-base transition-all duration-200 hover:scale-105"
-                >
-                  {t('comun.agendarLlamadaEstrategica')}
-                  <ArrowRight size={18} />
-                </Link>
-                <Link
-                  to="/cotizador"
-                  className="text-brand font-semibold text-base hover:text-brand-dark transition-colors"
-                >
-                  {t('home.irCotizador')}
-                </Link>
-              </div>
+      {/* CTA FINAL: cianotipo */}
+      <section className="plano-claro bg-violeta py-24 text-white sm:py-32">
+        <div className={`${contenedor} grid gap-y-10 lg:grid-cols-12 lg:gap-x-8`}>
+          <div className="lg:col-span-9 lg:col-start-4">
+            <h2 className="titular text-[clamp(1.9rem,4.8vw,4rem)] leading-[1.0]">
+              <span className="block">{t('home.ctaTitulo1')}</span>
+              <span className="block">{t('home.ctaTitulo2')}</span>
+            </h2>
+            <p className="mt-8 max-w-xl text-lg leading-relaxed text-white/85">{t('home.ctaTexto')}</p>
+            <div className="mt-10 flex flex-col gap-6 sm:flex-row sm:items-center">
+              <Link to="/agenda" className={boton.claro}>
+                {t('comun.agendarLlamadaEstrategica')}
+              </Link>
+              <Link to="/cotizador" className="font-semibold text-white underline decoration-white/40 decoration-2 underline-offset-[6px] transition-colors hover:decoration-white">
+                {t('home.irCotizador')}
+              </Link>
             </div>
           </div>
         </div>
       </section>
+
       {/* PREGUNTAS FRECUENTES: siempre al final de la portada */}
       <PreguntasFrecuentes />
     </div>

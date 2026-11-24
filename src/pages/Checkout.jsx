@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { CreditCard, Lock, ArrowRight, AlertCircle, Calendar, CheckCircle, Zap, LogIn, ExternalLink } from 'lucide-react'
+import { Lock, AlertCircle, CheckCircle, Zap, LogIn, ExternalLink } from 'lucide-react'
 import {
   pedidos, seleccion, fabricaPasarelas, config, formatoMoneda,
   TARJETA_APROBADA, TARJETA_RECHAZADA,
 } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
 import { useSesion } from '../sesion/SesionContext'
+import { Cargando, EncabezadoPagina, Paso } from '../components/Lamina'
+import { boton, campo, contenedor, errorCampo, etiquetaCampo } from '../components/estilos'
 
 // label y placeholder son claves del diccionario (i18n/es.js, en.js).
 const CAMPOS = [
-  { name: 'nombre', label: 'comun.nombreCompleto', type: 'text', placeholder: 'comun.tuNombre' },
-  { name: 'empresa', label: 'comun.empresa', type: 'text', placeholder: 'checkout.phEmpresa' },
-  { name: 'email', label: 'comun.email', type: 'email', placeholder: 'comun.phEmail' },
-  { name: 'telefono', label: 'comun.telefono', type: 'tel', placeholder: 'comun.phTelefono' },
+  { name: 'nombre', label: 'comun.nombreCompleto', type: 'text', placeholder: 'comun.tuNombre', autoComplete: 'name' },
+  { name: 'empresa', label: 'comun.empresa', type: 'text', placeholder: 'checkout.phEmpresa', autoComplete: 'organization' },
+  { name: 'email', label: 'comun.email', type: 'email', placeholder: 'comun.phEmail', autoComplete: 'email' },
+  { name: 'telefono', label: 'comun.telefono', type: 'tel', placeholder: 'comun.phTelefono', autoComplete: 'tel' },
 ]
 
 const tarjetaConEspacios = (n) => n.replace(/(\d{4})(?=\d)/g, '$1 ')
@@ -125,24 +127,17 @@ export default function Checkout() {
     }
   }
 
-  const inputClass = (field) =>
-    `w-full bg-white border ${errors[field] ? 'border-red-400' : 'border-slate-300'} rounded-lg px-4 py-3 text-navy text-sm placeholder-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-all duration-200`
-  const labelClass = 'text-slate-600 text-xs uppercase tracking-wider mb-2 block'
-  const cardClass = 'p-6 rounded-2xl border border-slate-200 bg-white shadow-sm'
-
   if (faltaSesion) {
     return (
-      <div className="min-h-screen bg-brand-soft/40 pt-28 pb-20 px-4">
-        <div className={`${cardClass} max-w-md mx-auto text-center`}>
-          <LogIn size={32} className="mx-auto text-brand mb-4" />
-          <h1 className="text-navy font-black text-2xl mb-2">{t('checkout.entraTitulo')}</h1>
-          <p className="text-slate-600 text-sm mb-6">{t('checkout.entraTexto')}</p>
-          <Link
-            to="/entrar?volver=/checkout"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors"
-          >
+      <div className="min-h-screen bg-lavanda px-5 pb-24 pt-32 sm:pt-40">
+        <div className="mx-auto max-w-md rounded-md bg-white p-8 text-center">
+          <span className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-md bg-lavanda text-violeta">
+            <LogIn size={22} aria-hidden="true" />
+          </span>
+          <h1 className="titular text-2xl text-negro">{t('checkout.entraTitulo')}</h1>
+          <p className="mt-3 leading-relaxed text-negro/70">{t('checkout.entraTexto')}</p>
+          <Link to="/entrar?volver=/checkout" className={`${boton.primario} mt-7`}>
             {t('nav.entrar')}
-            <ArrowRight size={16} />
           </Link>
         </div>
       </div>
@@ -151,205 +146,226 @@ export default function Checkout() {
 
   if (ocupacion === null || cargandoSesion) {
     return (
-      <div className="min-h-screen bg-brand-soft/40 pt-28 pb-20 px-4 flex justify-center">
-        <div className="w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
+      <div className="flex min-h-screen justify-center bg-white px-5 pb-24 pt-40">
+        <Cargando etiqueta={t('comun.cargando')} />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-brand-soft/40 pt-24 pb-20 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-10">
-          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-2 block">Checkout</span>
-          <h1 className="text-4xl font-black text-navy">{t('checkout.titulo')}</h1>
-        </div>
+    <div className="min-h-screen bg-white pb-24">
+      <EncabezadoPagina etiqueta="Checkout" titulo={t('checkout.titulo')} />
 
-        <div className="flex flex-col lg:flex-row gap-10">
-          <div className="flex-1">
-            <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-              {/* Contacto */}
-              <div className={cardClass}>
-                <h2 className="text-navy font-bold text-lg mb-5">{t('checkout.contacto')}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {CAMPOS.map(({ label, placeholder, ...c }) => (
-                    <div key={c.name}>
-                      <label htmlFor={c.name} className={labelClass}>{t(label)}</label>
-                      <input id={c.name} {...c} placeholder={t(placeholder)} value={form[c.name]} onChange={handleChange} className={inputClass(c.name)} />
-                      {errors[c.name] && <p className="text-red-600 text-xs mt-1">{errors[c.name]}</p>}
-                    </div>
-                  ))}
+      <div className={`${contenedor} mt-14 grid gap-12 lg:grid-cols-12 lg:gap-x-8`}>
+        <form onSubmit={handleSubmit} className="space-y-12 lg:col-span-7" noValidate>
+          {/* 1. Contacto */}
+          <Paso numero={1} titulo={t('checkout.contacto')}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {CAMPOS.map(({ label, placeholder, ...c }) => (
+                <div key={c.name}>
+                  <label htmlFor={c.name} className={etiquetaCampo}>
+                    {t(label)}
+                  </label>
+                  <input
+                    id={c.name}
+                    {...c}
+                    placeholder={t(placeholder)}
+                    value={form[c.name]}
+                    onChange={handleChange}
+                    aria-invalid={Boolean(errors[c.name])}
+                    className={campo(errors[c.name])}
+                  />
+                  {errors[c.name] && <p className={errorCampo}>{errors[c.name]}</p>}
                 </div>
-              </div>
-
-              {/* Entrega / agenda */}
-              <div className={cardClass}>
-                <h2 className="text-navy font-bold text-lg mb-2 flex items-center gap-2">
-                  <Calendar size={18} className="text-brand" />
-                  {t('checkout.entrega')}
-                </h2>
-                {cotizacion.partidas.some((x) => !x.producto.requiereAgenda) && (
-                  <p className="flex items-center gap-2 text-slate-700 text-sm mb-3">
-                    <Zap size={14} className="text-brand" />
-                    {t('checkout.digitalInmediato')}
-                  </p>
-                )}
-                {cotizacion.requiereAgenda && (
-                  <>
-                    <p className="text-slate-600 text-sm mb-5">
-                      {t('checkout.fechaSistema')} <span className="text-brand font-semibold">{fecha(propuesta.fechaArranque)}</span>.
-                      {' '}{t('checkout.siPrefieres')}
-                    </p>
-                    <label htmlFor="fecha" className={labelClass}>{t('checkout.tuFecha')}</label>
-                    <input
-                      id="fecha"
-                      type="date"
-                      value={fechaElegida}
-                      onChange={(e) => setFechaPreferida(e.target.value)}
-                      min={propuesta.fechaArranque}
-                      className={inputClass('fecha')}
-                    />
-                    {revision && (
-                      <div className={`mt-3 p-3 rounded-lg border text-sm flex items-start gap-2 ${
-                        revision.confirmada ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'
-                      }`}>
-                        {revision.confirmada ? <CheckCircle size={15} className="mt-0.5 flex-shrink-0" /> : <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />}
-                        <span>
-                          {revision.confirmada
-                            ? <>{t('checkout.disponible')} <strong>{fecha(revision.fecha)}</strong>.</>
-                            : <>{t(`fechaArranque.${revision.codigo}`, { dias: config.diasHabilesMinimosArranque })}. {t('checkout.masCercana')} <strong>{fecha(revision.fecha)}</strong> {t('checkout.seAgendara')}</>}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Pago */}
-              <div className={cardClass}>
-                <h2 className="text-navy font-bold text-lg mb-2 flex items-center gap-2">
-                  <CreditCard size={18} className="text-brand" />
-                  {t('checkout.pago')}
-                </h2>
-                <p className="mb-5 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <AlertCircle size={13} className="flex-shrink-0" />
-                  {paginaExterna ? t('checkout.modoPruebaExterno', { pasarela: nombrePasarela }) : t('checkout.modoPrueba')}
-                </p>
-
-                <p className={labelClass}>{t('checkout.pagarCon')}</p>
-                <div className="grid grid-cols-3 gap-3 mb-5" role="radiogroup" aria-label={t('checkout.pasarela')}>
-                  {fabricaPasarelas.disponibles().map((p) => (
-                    <button
-                      key={p.tipo}
-                      type="button"
-                      role="radio"
-                      aria-checked={pasarela === p.tipo}
-                      onClick={() => setPasarela(p.tipo)}
-                      className={`py-3 rounded-lg border text-sm font-semibold transition-all duration-200 ${
-                        pasarela === p.tipo ? 'border-brand bg-brand text-white' : 'border-slate-300 text-slate-700 hover:border-brand hover:text-brand'
-                      }`}
-                    >
-                      {p.etiqueta}
-                    </button>
-                  ))}
-                </div>
-
-                {paginaExterna ? (
-                  <div className="p-4 rounded-lg bg-brand-soft border border-brand/15 text-sm text-slate-700">
-                    <p className="flex items-center gap-2 text-navy font-semibold mb-1">
-                      <ExternalLink size={14} className="text-brand" />
-                      {t('checkout.paginaExterna', { pasarela: nombrePasarela })}
-                    </p>
-                    <p className="text-slate-600 text-xs">
-                      {TARJETAS_PAGINA[pasarela] && <>{t('checkout.tarjetaExterna')} <span className="font-mono">{TARJETAS_PAGINA[pasarela]}</span> · </>}
-                      {t(`checkout.datosPrueba.${pasarela}`)}
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <label htmlFor="tarjeta" className={labelClass}>{t('checkout.numeroTarjeta')}</label>
-                    <input
-                      id="tarjeta"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      value={tarjetaConEspacios(tarjeta)}
-                      onChange={(e) => setTarjeta(e.target.value.replace(/\D/g, '').slice(0, 16))}
-                      className={`${inputClass('tarjeta')} font-mono`}
-                    />
-                    {errors.tarjeta && <p className="text-red-600 text-xs mt-1">{errors.tarjeta}</p>}
-                    <p className="text-slate-500 text-xs mt-2">
-                      {t('checkout.tarjetasPrueba')}{' '}
-                      <button type="button" onClick={() => setTarjeta(TARJETA_APROBADA)} className="text-brand font-medium underline">{t('checkout.aprobada')}</button>
-                      {' · '}
-                      <button type="button" onClick={() => setTarjeta(TARJETA_RECHAZADA)} className="text-brand font-medium underline">{t('checkout.rechazada')}</button>
-                    </p>
-                  </>
-                )}
-
-                {errorPago && (
-                  <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2" role="alert">
-                    <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
-                    {errorPago}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || seleccionados.length === 0}
-                className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-base transition-all duration-200"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    {t('checkout.procesandoPago')}
-                  </>
-                ) : (
-                  <>
-                    <Lock size={16} />
-                    {paginaExterna ? t('checkout.pagarEn', { pasarela: nombrePasarela }) : t('checkout.pagar')} {formatoMoneda(cotizacion.totalHoy)} MXN
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-
-          {/* Resumen */}
-          <div className="lg:w-80 xl:w-96">
-            <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-200">
-                <h2 className="text-navy font-bold">{t('checkout.resumen')}</h2>
-              </div>
-              <div className="p-5 space-y-3">
-                {cotizacion.partidas.map(({ producto: p, cobro }) => (
-                  <div key={p.id} className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-navy text-sm font-medium">{p.nombre}</p>
-                      <p className="text-slate-500 text-xs mt-0.5">{t(`tipo.${p.tipo}`)} · {detalleCobro(p.id)}</p>
-                    </div>
-                    <span className="text-slate-700 text-sm font-medium whitespace-nowrap">{formatoMoneda(cobro.hoy)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-slate-200 p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-slate-600 text-sm">{t('cotizador.valorTotal')}</span>
-                  <span className="text-slate-700 text-sm">{formatoMoneda(cotizacion.totalContrato)} MXN</span>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-slate-200">
-                  <span className="text-navy font-bold">{t('cotizador.aPagarHoy')}</span>
-                  <span className="text-brand font-black text-lg">{formatoMoneda(cotizacion.totalHoy)} MXN</span>
-                </div>
-              </div>
-              <div className="px-5 pb-5">
-                <p className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 text-xs leading-relaxed">
-                  {t('checkout.notaPublicidad')}
-                </p>
-              </div>
+              ))}
             </div>
+          </Paso>
+
+          {/* 2. Entrega / agenda */}
+          <Paso numero={2} titulo={t('checkout.entrega')}>
+            {cotizacion.partidas.some((x) => !x.producto.requiereAgenda) && (
+              <p className="mb-4 flex items-center gap-2 text-[15px] text-negro/80">
+                <Zap size={15} aria-hidden="true" className="text-violeta" />
+                {t('checkout.digitalInmediato')}
+              </p>
+            )}
+            {cotizacion.requiereAgenda && (
+              <>
+                <p className="mb-5 text-[15px] leading-relaxed text-negro/70">
+                  {t('checkout.fechaSistema')} <span className="font-semibold text-negro">{fecha(propuesta.fechaArranque)}</span>.
+                  {' '}{t('checkout.siPrefieres')}
+                </p>
+                <label htmlFor="fecha" className={etiquetaCampo}>
+                  {t('checkout.tuFecha')}
+                </label>
+                <input
+                  id="fecha"
+                  type="date"
+                  value={fechaElegida}
+                  onChange={(e) => setFechaPreferida(e.target.value)}
+                  min={propuesta.fechaArranque}
+                  className={`${campo(false)} sm:max-w-xs`}
+                />
+                {revision && (
+                  <div
+                    className={`mt-4 flex items-start gap-2.5 border-l-2 px-4 py-3 text-sm leading-relaxed ${
+                      revision.confirmada ? 'border-violeta bg-lavanda text-negro' : 'border-cian bg-cian/10 text-negro'
+                    }`}
+                  >
+                    {revision.confirmada ? (
+                      <CheckCircle size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+                    )}
+                    <span>
+                      {revision.confirmada ? (
+                        <>
+                          {t('checkout.disponible')} <strong>{fecha(revision.fecha)}</strong>.
+                        </>
+                      ) : (
+                        <>
+                          {t(`fechaArranque.${revision.codigo}`, { dias: config.diasHabilesMinimosArranque })}. {t('checkout.masCercana')}{' '}
+                          <strong>{fecha(revision.fecha)}</strong> {t('checkout.seAgendara')}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+          </Paso>
+
+          {/* 3. Pago */}
+          <Paso numero={3} titulo={t('checkout.pago')}>
+            <p className="mb-6 flex items-start gap-2 border-l-2 border-violeta bg-lavanda px-4 py-2.5 text-[13px] leading-relaxed text-negro">
+              <AlertCircle size={14} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+              {paginaExterna ? t('checkout.modoPruebaExterno', { pasarela: nombrePasarela }) : t('checkout.modoPrueba')}
+            </p>
+
+            <p className={etiquetaCampo}>{t('checkout.pagarCon')}</p>
+            <div className="mb-6 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t('checkout.pasarela')}>
+              {fabricaPasarelas.disponibles().map((p) => {
+                const activa = pasarela === p.tipo
+                return (
+                  <button
+                    key={p.tipo}
+                    type="button"
+                    role="radio"
+                    aria-checked={activa}
+                    onClick={() => setPasarela(p.tipo)}
+                    className={`rounded-md border px-2 py-3.5 text-sm font-semibold transition-colors duration-200 ${
+                      activa ? 'border-violeta bg-lavanda text-violeta ring-1 ring-violeta' : 'border-negro/20 text-negro/80 hover:border-violeta hover:text-violeta'
+                    }`}
+                  >
+                    {p.etiqueta}
+                  </button>
+                )
+              })}
+            </div>
+
+            {paginaExterna ? (
+              <div className="rounded-md bg-lavanda p-4 text-sm text-negro/80">
+                <p className="mb-1 flex items-center gap-2 font-semibold text-negro">
+                  <ExternalLink size={14} aria-hidden="true" className="text-violeta" />
+                  {t('checkout.paginaExterna', { pasarela: nombrePasarela })}
+                </p>
+                <p className="text-[13px] leading-relaxed text-negro/70">
+                  {TARJETAS_PAGINA[pasarela] && (
+                    <>
+                      {t('checkout.tarjetaExterna')} <span className="font-display tabular-nums">{TARJETAS_PAGINA[pasarela]}</span> ·{' '}
+                    </>
+                  )}
+                  {t(`checkout.datosPrueba.${pasarela}`)}
+                </p>
+              </div>
+            ) : (
+              <>
+                <label htmlFor="tarjeta" className={etiquetaCampo}>
+                  {t('checkout.numeroTarjeta')}
+                </label>
+                <input
+                  id="tarjeta"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={tarjetaConEspacios(tarjeta)}
+                  onChange={(e) => setTarjeta(e.target.value.replace(/\D/g, '').slice(0, 16))}
+                  aria-invalid={Boolean(errors.tarjeta)}
+                  className={`${campo(errors.tarjeta)} font-display tabular-nums tracking-wider`}
+                />
+                {errors.tarjeta && <p className={errorCampo}>{errors.tarjeta}</p>}
+                <p className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-negro/60">
+                  {t('checkout.tarjetasPrueba')}
+                  <button
+                    type="button"
+                    onClick={() => setTarjeta(TARJETA_APROBADA)}
+                    className="rounded-full border border-negro/15 px-2.5 py-1 font-medium text-negro transition-colors hover:border-violeta hover:text-violeta"
+                  >
+                    {t('checkout.aprobada')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTarjeta(TARJETA_RECHAZADA)}
+                    className="rounded-full border border-negro/15 px-2.5 py-1 font-medium text-negro transition-colors hover:border-violeta hover:text-violeta"
+                  >
+                    {t('checkout.rechazada')}
+                  </button>
+                </p>
+              </>
+            )}
+
+            {errorPago && (
+              <div className="mt-5 flex items-start gap-2.5 border-l-2 border-red-600 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+                <AlertCircle size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0" />
+                {errorPago}
+              </div>
+            )}
+          </Paso>
+
+          <button type="submit" disabled={loading || seleccionados.length === 0} className={`${boton.primario} w-full py-4 text-base`}>
+            {loading ? (
+              <>
+                <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                {t('checkout.procesandoPago')}
+              </>
+            ) : (
+              <>
+                <Lock size={16} aria-hidden="true" />
+                {paginaExterna ? t('checkout.pagarEn', { pasarela: nombrePasarela }) : t('checkout.pagar')} {formatoMoneda(cotizacion.totalHoy)} MXN
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Resumen */}
+        <aside className="lg:col-span-5 lg:col-start-8 xl:col-span-4 xl:col-start-9">
+          <div className="rounded-md bg-lavanda lg:sticky lg:top-24">
+            <h2 className="border-b border-violeta/15 px-5 py-4 font-bold text-negro">{t('checkout.resumen')}</h2>
+            <ul className="divide-y divide-violeta/15 px-5">
+              {cotizacion.partidas.map(({ producto: p, cobro }) => (
+                <li key={p.id} className="flex items-start justify-between gap-3 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-semibold text-negro">{p.nombre}</p>
+                    <p className="mt-0.5 text-[13px] leading-snug text-negro/70">
+                      {t(`tipo.${p.tipo}`)} · {detalleCobro(p.id)}
+                    </p>
+                  </div>
+                  <span className="whitespace-nowrap text-sm font-semibold text-negro tabular-nums">{formatoMoneda(cobro.hoy)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="border-t border-violeta/15 px-5 py-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-sm text-negro/70">{t('cotizador.valorTotal')}</dt>
+                <dd className="text-sm text-negro/80 tabular-nums">{formatoMoneda(cotizacion.totalContrato)} MXN</dd>
+              </div>
+              <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-dashed border-violeta/25 pt-3">
+                <dt className="font-bold text-negro">{t('cotizador.aPagarHoy')}</dt>
+                <dd className="cifra text-2xl text-violeta">{formatoMoneda(cotizacion.totalHoy)} MXN</dd>
+              </div>
+            </dl>
+            <p className="px-5 pb-5 text-xs leading-relaxed text-negro/60">{t('checkout.notaPublicidad')}</p>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   )

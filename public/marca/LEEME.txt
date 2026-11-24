@@ -1,0 +1,9 @@
+Logos oficiales de Socius (carpeta de marca).
+
+Guarda aquí, con estos nombres exactos:
+  socius-logo.svg         -> versión a color, para fondos claros (barra superior)
+  socius-logo-blanco.svg  -> versión en blanco, para fondos oscuros (pie de página)
+
+Si usas PNG, cambia la extensión en src/components/Logo.jsx.
+El brief pide no tipear "SOCIUS" ni redibujar el infinito: mientras falten
+estos archivos, la página muestra un texto provisional.

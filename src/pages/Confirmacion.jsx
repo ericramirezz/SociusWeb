@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle, Calendar, Hash, Package, ArrowRight, Clock } from 'lucide-react'
+import { Check, Calendar, Clock } from 'lucide-react'
 import EstadoBadge from '../components/EstadoBadge'
 import { pedidos, seleccion, formatoMoneda, ESTADOS } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { Cargando } from '../components/Lamina'
+import { boton } from '../components/estilos'
 
 // Al volver de la página de Stripe, el pago lo confirma el webhook unos segundos después:
 // mientras la orden siga cotizada se vuelve a consultar cada 2 s, hasta 1 minuto.
 const ESPERA_MS = 2000
 const MAX_CONSULTAS = 30
+
+function Dato({ titulo, children }) {
+  return (
+    <div>
+      <dt className="text-[13px] text-negro/60">{titulo}</dt>
+      <dd className="mt-0.5 break-words text-[15px] font-medium text-negro">{children}</dd>
+    </div>
+  )
+}
 
 export default function Confirmacion() {
   const navigate = useNavigate()
@@ -46,165 +57,127 @@ export default function Confirmacion() {
   // Todavía sin confirmar: el cliente acaba de pagar en Stripe y el webhook no ha llegado.
   if (orden.estado === ESTADOS.COTIZADA) {
     return (
-      <div className="min-h-screen bg-white pt-24 pb-20 px-4 flex items-center">
-        <div className="max-w-md mx-auto w-full text-center">
+      <div className="flex min-h-screen items-center bg-white px-5 pb-24 pt-32">
+        <div className="mx-auto w-full max-w-md text-center">
           {agotado ? (
-            <Clock size={40} className="mx-auto text-brand mb-5" />
+            <span className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-lavanda text-violeta">
+              <Clock size={26} aria-hidden="true" />
+            </span>
           ) : (
-            <div className="mx-auto mb-5 w-10 h-10 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
+            <Cargando etiqueta={t('comun.cargando')} className="mx-auto mb-6 h-10 w-10" />
           )}
-          <h1 className="text-3xl font-black text-navy mb-3">{agotado ? t('confirmacion.tardando') : t('confirmacion.confirmando')}</h1>
-          <p className="text-slate-600 mb-2">{agotado ? t('confirmacion.tardandoTexto') : t('confirmacion.confirmandoTexto')}</p>
-          <p className="text-brand font-bold tracking-wider mb-8">{orden.id}</p>
-          <Link
-            to="/pedidos"
-            className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors"
-          >
+          <h1 className="titular text-3xl text-negro">{agotado ? t('confirmacion.tardando') : t('confirmacion.confirmando')}</h1>
+          <p className="mt-3 leading-relaxed text-negro/70">{agotado ? t('confirmacion.tardandoTexto') : t('confirmacion.confirmandoTexto')}</p>
+          <p className="mt-5 font-display tabular-nums text-lg font-bold text-violeta">{orden.id}</p>
+          <Link to="/pedidos" className={`${boton.primario} mt-8`}>
             {t('confirmacion.verPedidos')}
-            <ArrowRight size={15} />
           </Link>
         </div>
       </div>
     )
   }
 
-
   const fechaOrdenFormateada = new Date(orden.fechaOrden).toLocaleDateString(locale, {
     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
   })
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20 px-4 flex items-center">
-      <div className="max-w-2xl mx-auto w-full">
-        {/* Success banner */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 border border-green-500/20 mb-5">
-            <CheckCircle size={40} className="text-green-700" />
+    <div className="min-h-screen bg-lavanda px-5 pb-24 pt-28 sm:pt-36">
+      <div className="mx-auto w-full max-w-2xl">
+        {/* Encabezado de éxito */}
+        <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+          <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-violeta text-white animate-aparece">
+            <Check size={28} strokeWidth={3} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 className="titular text-[clamp(1.75rem,4.5vw,2.5rem)] leading-none text-negro">{t('confirmacion.titulo')}</h1>
+            <p className="mt-2 text-negro/70">{t('confirmacion.procesado', { pasarela: orden.pago?.pasarela ?? '' })}</p>
           </div>
-          <h1 className="text-4xl font-black text-navy mb-3">{t('confirmacion.titulo')}</h1>
-          <p className="text-slate-600 text-lg">
-            {t('confirmacion.procesado', { pasarela: orden.pago?.pasarela ?? '' })}
-          </p>
         </div>
 
-        {/* Order card */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-6">
-          {/* Header */}
-          <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-brand/5 to-transparent">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">{t('confirmacion.numeroOrden')}</p>
-                <div className="flex items-center gap-2">
-                  <Hash size={14} className="text-brand" />
-                  <span className="text-brand font-black text-xl tracking-wider">{orden.id}</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">{t('confirmacion.estado')}</p>
-                <EstadoBadge estado={orden.estado} />
-              </div>
-            </div>
-          </div>
-
-          {/* Details */}
-          <div className="p-6 space-y-6">
-            {/* Client */}
+        {/* Comprobante */}
+        <article className="mt-10 overflow-hidden rounded-md bg-white">
+          <header className="flex flex-wrap items-end justify-between gap-4 border-b border-negro/10 p-6 sm:p-8">
             <div>
-              <p className="text-slate-500 text-xs uppercase tracking-widest mb-3">{t('confirmacion.cliente')}</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-slate-400 text-xs mb-0.5">{t('confirmacion.nombre')}</p>
-                  <p className="text-navy text-sm font-medium">{orden.cliente.nombre}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-xs mb-0.5">{t('confirmacion.empresa')}</p>
-                  <p className="text-navy text-sm font-medium">{orden.cliente.empresa}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-xs mb-0.5">{t('comun.email')}</p>
-                  <p className="text-navy text-sm">{orden.cliente.email}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-xs mb-0.5">{t('comun.telefono')}</p>
-                  <p className="text-navy text-sm">{orden.cliente.telefono}</p>
-                </div>
-              </div>
+              <p className="text-[13px] text-negro/60">{t('confirmacion.numeroOrden')}</p>
+              <p className="mt-1 font-display tabular-nums text-2xl font-bold text-negro sm:text-3xl">{orden.id}</p>
             </div>
+            <div className="text-right">
+              <p className="mb-1.5 text-[13px] text-negro/60">{t('confirmacion.estado')}</p>
+              <EstadoBadge estado={orden.estado} />
+            </div>
+          </header>
 
-            {/* Programs */}
-            <div>
-              <p className="text-slate-500 text-xs uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Package size={12} />
-                {t('confirmacion.contratados')}
-              </p>
-              <div className="space-y-2">
+          <div className="space-y-8 p-6 sm:p-8">
+            <section>
+              <h2 className="mb-4 text-sm font-semibold text-negro">{t('confirmacion.cliente')}</h2>
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Dato titulo={t('confirmacion.nombre')}>{orden.cliente.nombre}</Dato>
+                <Dato titulo={t('confirmacion.empresa')}>{orden.cliente.empresa}</Dato>
+                <Dato titulo={t('comun.email')}>{orden.cliente.email}</Dato>
+                <Dato titulo={t('comun.telefono')}>{orden.cliente.telefono}</Dato>
+              </dl>
+            </section>
+
+            <section>
+              <h2 className="mb-2 text-sm font-semibold text-negro">{t('confirmacion.contratados')}</h2>
+              <ul className="divide-y divide-negro/10 border-y border-negro/10">
                 {orden.partidas.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+                  <li key={p.id} className="flex items-center justify-between gap-4 py-3">
                     <div>
-                      <p className="text-navy text-sm font-medium">{p.nombre}</p>
-                      <p className="text-slate-500 text-xs">{detalleCobro(p.id)}</p>
+                      <p className="text-[15px] font-semibold text-negro">{p.nombre}</p>
+                      <p className="text-[13px] text-negro/60">{detalleCobro(p.id)}</p>
                     </div>
-                    <span className="text-brand font-bold text-sm">{formatoMoneda(p.cobroHoy)} MXN</span>
-                  </div>
+                    <span className="whitespace-nowrap text-sm font-semibold text-negro tabular-nums">{formatoMoneda(p.cobroHoy)} MXN</span>
+                  </li>
                 ))}
+              </ul>
+              <div className="mt-4 flex items-baseline justify-between gap-4">
+                <span className="font-bold text-negro">{t('confirmacion.totalPagado')}</span>
+                <span className="cifra text-3xl text-violeta">{formatoMoneda(orden.totalHoy)} MXN</span>
               </div>
-            </div>
+            </section>
 
-            {/* Total */}
-            <div className="border-t border-slate-200 pt-4 flex items-center justify-between">
-              <span className="text-navy font-bold">{t('confirmacion.totalPagado')}</span>
-              <span className="text-brand font-black text-2xl">{formatoMoneda(orden.totalHoy)} MXN</span>
-            </div>
-
-            {/* Dates */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calendar size={13} className="text-brand" />
-                  <p className="text-slate-500 text-xs uppercase tracking-wider">{t('confirmacion.fechaOrden')}</p>
-                </div>
-                <p className="text-navy text-sm">{fechaOrdenFormateada}</p>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-md border border-negro/10 p-4">
+                <dt className="flex items-center gap-2 text-[13px] text-negro/60">
+                  <Calendar size={13} aria-hidden="true" />
+                  {t('confirmacion.fechaOrden')}
+                </dt>
+                <dd className="mt-1.5 text-[15px] text-negro">{fechaOrdenFormateada}</dd>
               </div>
-              <div className="p-3 rounded-lg bg-brand/5 border border-brand/15">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calendar size={13} className="text-brand" />
-                  <p className="text-brand text-xs uppercase tracking-wider">{orden.fechaArranque ? t('confirmacion.fechaArranque') : t('confirmacion.entrega')}</p>
-                </div>
+              <div className="rounded-md border-l-2 border-violeta bg-lavanda p-4">
+                <dt className="flex items-center gap-2 text-[13px] font-medium text-violeta">
+                  <Calendar size={13} aria-hidden="true" />
+                  {orden.fechaArranque ? t('confirmacion.fechaArranque') : t('confirmacion.entrega')}
+                </dt>
                 {orden.fechaArranque ? (
-                  <>
-                    <p className="text-navy font-semibold text-sm">{fecha(orden.fechaArranque)}</p>
-                    <p className="text-slate-600 text-xs mt-1">{t('confirmacion.primeraVersion')} {fecha(orden.fechaEntrega)}</p>
-                    {orden.fechaAjustada && <p className="text-amber-800 text-xs mt-1">{t('confirmacion.ajustada')}</p>}
-                  </>
+                  <dd className="mt-1.5">
+                    <p className="text-[15px] font-semibold text-negro">{fecha(orden.fechaArranque)}</p>
+                    <p className="mt-1 text-[13px] text-negro/70">
+                      {t('confirmacion.primeraVersion')} {fecha(orden.fechaEntrega)}
+                    </p>
+                    {orden.fechaAjustada && <p className="mt-1 text-[13px] text-violeta">{t('confirmacion.ajustada')}</p>}
+                  </dd>
                 ) : (
-                  <p className="text-navy font-semibold text-sm">{t('confirmacion.accesoInmediato')}</p>
+                  <dd className="mt-1.5 text-[15px] font-semibold text-negro">{t('confirmacion.accesoInmediato')}</dd>
                 )}
               </div>
-            </div>
+            </dl>
           </div>
-        </div>
+        </article>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            to="/pedidos"
-            className="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl text-sm transition-all duration-200"
-          >
+        {/* Acciones */}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Link to="/pedidos" className={`${boton.primario} flex-1`}>
             {t('confirmacion.verPedidos')}
-            <ArrowRight size={15} />
           </Link>
-          <Link
-            to="/"
-            className="flex-1 flex items-center justify-center gap-2 border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-navy font-medium py-3.5 rounded-xl text-sm transition-all duration-200"
-          >
+          <Link to="/" className={`${boton.secundario} flex-1 bg-white`}>
             {t('confirmacion.volverInicio')}
           </Link>
         </div>
 
-        {/* Note */}
-        <p className="text-center text-slate-400 text-xs mt-6">
-          {t('confirmacion.nota')}
-        </p>
+        <p className="mt-6 text-center text-[13px] leading-relaxed text-negro/60">{t('confirmacion.nota')}</p>
       </div>
     </div>
   )

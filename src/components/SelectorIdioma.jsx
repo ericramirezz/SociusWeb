@@ -29,18 +29,18 @@ export default function SelectorIdioma() {
         aria-label={t('nav.idioma')}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        className={`flex items-center gap-1.5 p-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-          abierto ? 'text-brand bg-brand/10' : 'text-slate-700 hover:text-navy hover:bg-slate-100'
+        className={`flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors duration-200 ${
+          abierto ? 'bg-lavanda text-violeta' : 'text-negro/70 hover:bg-lavanda hover:text-negro'
         }`}
       >
-        <Globe size={19} />
-        <span className="uppercase text-xs font-semibold">{idioma}</span>
+        <Globe size={18} aria-hidden="true" />
+        <span className="text-xs font-semibold uppercase">{idioma}</span>
       </button>
 
       {abierto && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-60 bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-200/70 py-2 animate-fade-in"
+          className="absolute right-0 top-full z-10 mt-2 w-60 overflow-hidden rounded-md border border-negro/10 bg-white py-1.5 shadow-[0_16px_40px_-16px_rgb(17_16_33_/_0.35)] animate-aparece"
         >
           {IDIOMAS.map((i) => {
             const activo = i.codigo === idioma
@@ -55,12 +55,12 @@ export default function SelectorIdioma() {
                   setIdioma(i.codigo)
                   setAbierto(false)
                 }}
-                className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold transition-colors ${
-                  activo ? 'text-brand bg-brand/5' : 'text-slate-700 hover:bg-slate-50 hover:text-navy'
+                className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium transition-colors ${
+                  activo ? 'text-violeta' : 'text-negro/80 hover:bg-lavanda hover:text-negro'
                 }`}
               >
                 {i.nombre}
-                {activo && <Check size={16} />}
+                {activo && <Check size={16} aria-hidden="true" />}
               </button>
             )
           })}

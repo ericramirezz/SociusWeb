@@ -195,7 +195,31 @@ Los números viven en `core/config.js`.
 
 ## Identidad visual
 
-Blanco y azules. Tokens en `tailwind.config.js`: `brand` (#1D4ED8), `brand-dark` (#1E3A8A), `brand-soft` (#EFF6FF), `navy` (#0B1F3A). Usar siempre los tokens, nunca hex sueltos.
+Según el *Brief para el prototipo web* (v1.0). Tokens en `tailwind.config.js`; usar siempre los tokens, nunca hex sueltos:
+
+| Token | Color | Uso |
+| --- | --- | --- |
+| `violeta` | #5348CF | Violeta Estratégico, color primario |
+| `cian` | #659FFB | Cian Tecnológico, acento de IA |
+| `lavanda` | #EFECFD | Superficie de apoyo |
+| `negro` | #111021 | Negro Autoridad, texto |
+
+- No se usan colores fuera de la paleta; los tonos intermedios salen con opacidad (`text-negro/70`). Única excepción: rojo para errores y acciones destructivas.
+- Titulares en **Space Grotesk, en mayúsculas** (clase `.titular`); cifras con `.cifra`. Cuerpo en **Outfit**. Las dos se sirven desde la app con `@fontsource-variable`.
+- Degradado (`bg-degradado`) siempre violeta a cian, solo en fondos y formas, nunca en texto.
+- Fondo claro por defecto (blanco o lavanda); el oscuro es acento.
+- Logo: solo archivos oficiales en `public/marca/` (ver `LEEME.txt`); `components/Logo.jsx` los muestra y, mientras falten, pone un texto provisional.
+
+### Lenguaje "lámina"
+
+Cada pantalla se lee como un plano de arquitectura (el mundo de nuestros clientes):
+
+- **Encabezados con nota al margen:** línea superior, etiqueta en la columna izquierda y título en la columna de lectura (`EncabezadoSeccion` / `EncabezadoPagina` en `components/Lamina.jsx`).
+- **El bloque como unidad:** marca las etiquetas, llena las casillas del cotizador y, en la portada, apila los 12 meses en 4 con el degradado de marca (`components/CompresionTiempo.jsx`). Es el único movimiento automático del sitio y respeta "reducir movimiento".
+- **Cotas** (`Cota`) para medir tiempo, y números en círculo solo donde hay un orden real (pasos de la máquina, checkout, agenda).
+- **Botones, campos y contenedor** salen de `components/estilos.js`; no repetir clases a mano.
+- Sin sombras decorativas: la estructura la dan las líneas finas y los cambios de fondo (blanco, `lavanda`, `negro`, `violeta`).
+- **Testimonios:** marcas, casos con cifras del brief (`data/casos.js`, citados tal cual) y un directorio de clientes con la cita destacada (pestañas accesibles con teclado).
 
 ## Notas de clase aplicadas
 

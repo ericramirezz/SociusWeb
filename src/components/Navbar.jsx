@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, X, ChevronRight } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useIdioma } from '../i18n/IdiomaContext'
 import SelectorIdioma from './SelectorIdioma'
 import MenuCuenta from './MenuCuenta'
+import Logo from './Logo'
+import { boton, contenedor } from './estilos'
 
 const navLinks = [
   { clave: 'inicio', href: '/' },
@@ -21,8 +23,9 @@ export default function Navbar() {
   const { t } = useIdioma()
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', handleScroll)
+    const handleScroll = () => setScrolled(window.scrollY > 12)
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
@@ -30,92 +33,104 @@ export default function Navbar() {
     setMenuOpen(false)
   }, [location.pathname])
 
+  // Con el menú móvil abierto, la página de atrás no se desplaza.
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
+
+  const solido = scrolled || menuOpen
+
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-lg shadow-slate-200/70' : 'bg-transparent'
+      className={`fixed inset-x-0 top-0 z-50 transition-[background-color,border-color] duration-300 ${
+        // Sin desenfoque con el menú abierto: backdrop-filter haría que el panel fijo se mida contra la barra.
+        menuOpen ? 'border-b border-negro/10 bg-white' : solido ? 'border-b border-negro/10 bg-white/95 backdrop-blur-md' : 'border-b border-transparent bg-white/0'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className={contenedor}>
+        <div className="flex h-[72px] items-center justify-between gap-6">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <span className="text-2xl font-black tracking-widest text-brand group-hover:text-brand-dark transition-colors duration-200">
-              SOCIUS
-            </span>
+          <Link to="/" className="flex items-center">
+            <Logo className="h-8" />
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`px-3 xl:px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  location.pathname === link.href
-                    ? 'text-brand bg-brand/10'
-                    : 'text-slate-700 hover:text-navy hover:bg-slate-100'
-                }`}
-              >
-                {t(`nav.${link.clave}`)}
-              </Link>
-            ))}
+          <nav className="hidden items-center gap-7 lg:flex">
+            {navLinks.map((link) => {
+              const activo = location.pathname === link.href
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  aria-current={activo ? 'page' : undefined}
+                  className={`relative py-2 text-sm font-medium transition-colors duration-200 ${
+                    activo
+                      ? 'text-negro after:absolute after:inset-x-0 after:-bottom-[25px] after:h-0.5 after:bg-violeta'
+                      : 'text-negro/70 hover:text-negro'
+                  }`}
+                >
+                  {t(`nav.${link.clave}`)}
+                </Link>
+              )
+            })}
           </nav>
 
           {/* Idioma + CTA */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden items-center gap-1 lg:flex">
             <SelectorIdioma />
             <MenuCuenta />
-            <Link
-              to="/agenda"
-              className="flex items-center gap-1 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-md transition-all duration-200"
-            >
+            <Link to="/agenda" className={`${boton.chico} ml-3`}>
               {t('nav.cta')}
-              <ChevronRight size={16} />
             </Link>
           </div>
 
           {/* Mobile: idioma + hamburguesa */}
-          <div className="lg:hidden flex items-center gap-1">
+          <div className="flex items-center gap-1 lg:hidden">
             <SelectorIdioma />
             <MenuCuenta />
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 rounded-md text-slate-700 hover:text-navy hover:bg-slate-100 transition-colors"
+              className="rounded-md p-2 text-negro transition-colors hover:bg-lavanda"
               aria-label={t('nav.abrirMenu')}
+              aria-expanded={menuOpen}
+              aria-controls="menu-movil"
             >
-              {menuOpen ? <X size={22} /> : <Menu size={22} />}
+              {menuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu: hoja completa con enlaces grandes */}
       {menuOpen && (
-        <div className="lg:hidden bg-white/98 border-t border-slate-200 backdrop-blur-sm">
-          <div className="px-4 py-4 space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`block px-4 py-3 rounded-md text-sm font-medium transition-all duration-200 ${
-                  location.pathname === link.href
-                    ? 'text-brand bg-brand/10'
-                    : 'text-slate-700 hover:text-navy hover:bg-slate-100'
-                }`}
-              >
-                {t(`nav.${link.clave}`)}
-              </Link>
-            ))}
-            <div className="pt-2 pb-1">
-              <Link
-                to="/agenda"
-                className="block w-full text-center bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-3 rounded-md transition-all duration-200"
-              >
-                {t('nav.ctaMovil')}
-              </Link>
-            </div>
-          </div>
+        <div id="menu-movil" className="fixed inset-x-0 bottom-0 top-[73px] overflow-y-auto bg-white lg:hidden">
+          <nav className={`${contenedor} flex min-h-full flex-col pb-8 pt-4`}>
+            <ul className="border-t border-negro/10">
+              {navLinks.map((link) => {
+                const activo = location.pathname === link.href
+                return (
+                  <li key={link.href} className="border-b border-negro/10">
+                    <Link
+                      to={link.href}
+                      aria-current={activo ? 'page' : undefined}
+                      className={`flex items-center justify-between py-4 text-2xl font-bold tracking-subtitular ${
+                        activo ? 'text-violeta' : 'text-negro'
+                      }`}
+                    >
+                      {t(`nav.${link.clave}`)}
+                      {activo && <span aria-hidden="true" className="h-2.5 w-2.5 bg-violeta" />}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+            <Link to="/agenda" className={`${boton.primario} mt-auto w-full`}>
+              {t('nav.ctaMovil')}
+            </Link>
+          </nav>
         </div>
       )}
     </header>

@@ -31,13 +31,15 @@ export default function MenuCuenta() {
       <Link
         to="/entrar"
         aria-label={t('nav.entrar')}
-        className="flex items-center gap-1.5 p-2 rounded-md text-sm font-medium text-slate-700 hover:text-navy hover:bg-slate-100 transition-colors"
+        className="flex h-10 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-negro/70 transition-colors hover:bg-lavanda hover:text-negro"
       >
-        <LogIn size={18} />
+        <LogIn size={18} aria-hidden="true" />
         <span className="hidden xl:inline">{t('nav.entrar')}</span>
       </Link>
     )
   }
+
+  const opcion = 'flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-medium text-negro/80 transition-colors hover:bg-lavanda hover:text-negro'
 
   return (
     <div ref={ref} className="relative">
@@ -47,20 +49,18 @@ export default function MenuCuenta() {
         aria-label={t('nav.cuenta')}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        className="w-9 h-9 rounded-full bg-brand text-white text-sm font-bold flex items-center justify-center hover:bg-brand-dark transition-colors"
+        className="ml-1 flex h-9 w-9 items-center justify-center rounded-md bg-negro text-sm font-bold text-white transition-colors hover:bg-violeta"
       >
         {usuario.email?.[0]?.toUpperCase() ?? '?'}
       </button>
       {abierto && (
-        <div role="menu" className="absolute right-0 top-full mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-200/70 py-2 animate-fade-in">
-          <p className="px-4 pt-1 pb-3 text-xs text-slate-500 border-b border-slate-100 break-all">{usuario.email}</p>
-          <Link
-            to="/pedidos"
-            role="menuitem"
-            onClick={() => setAbierto(false)}
-            className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-navy"
-          >
-            <Package size={15} />
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-10 mt-2 w-64 overflow-hidden rounded-md border border-negro/10 bg-white py-1.5 shadow-[0_16px_40px_-16px_rgb(17_16_33_/_0.35)] animate-aparece"
+        >
+          <p className="break-all border-b border-negro/10 px-4 pb-3 pt-2 text-[13px] text-negro/60">{usuario.email}</p>
+          <Link to="/pedidos" role="menuitem" onClick={() => setAbierto(false)} className={opcion}>
+            <Package size={15} aria-hidden="true" />
             {t('nav.pedidos')}
           </Link>
           <button
@@ -70,9 +70,9 @@ export default function MenuCuenta() {
               setAbierto(false)
               salir()
             }}
-            className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-navy"
+            className={opcion}
           >
-            <LogOut size={15} />
+            <LogOut size={15} aria-hidden="true" />
             {t('nav.salir')}
           </button>
         </div>

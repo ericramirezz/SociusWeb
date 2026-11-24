@@ -1,10 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Calendar, Clock, CheckCircle, ArrowRight, Phone, Mail, MessageSquare } from 'lucide-react'
+import { Calendar, Clock, Check, Phone, Mail, MessageSquare } from 'lucide-react'
 
 import { agenda, formatoLargo, HORARIO_OCUPADO } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { Cargando, EncabezadoPagina, Paso } from '../components/Lamina'
+import { boton, campo, contenedor, errorCampo, etiquetaCampo } from '../components/estilos'
 
 const diaSemana = (iso, locale) => formatoLargo(iso, locale).split(',')[0]
+// Partes de la fecha para el encabezado de cada día (el formato lo da el idioma activo).
+const parte = (iso, locale, opciones) => new Date(`${iso}T12:00:00`).toLocaleDateString(locale, opciones)
+
+const CAMPOS = [
+  { name: 'nombre', label: 'comun.nombreCompleto', type: 'text', placeholder: 'comun.tuNombre', autoComplete: 'name' },
+  { name: 'empresa', label: 'comun.empresa', type: 'text', placeholder: 'agenda.phEmpresa', autoComplete: 'organization' },
+  { name: 'email', label: 'comun.email', type: 'email', placeholder: 'comun.phEmail', autoComplete: 'email' },
+  { name: 'telefono', label: 'comun.telefono', type: 'tel', placeholder: 'comun.phTelefono', autoComplete: 'tel' },
+]
 
 export default function Agenda() {
   const { t, fecha, locale } = useIdioma()
@@ -61,254 +72,194 @@ export default function Agenda() {
     }
   }
 
-  const inputClass = (field) =>
-    `w-full bg-white border ${errors[field] ? 'border-red-400' : 'border-slate-300'} rounded-lg px-4 py-3 text-navy text-sm placeholder-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 transition-all duration-200`
-
   if (submitted) {
     const fechaFormateada = fecha(selectedSlot.fecha)
+    const filas = [
+      { Icono: Calendar, titulo: t('agenda.fecha'), valor: fechaFormateada },
+      { Icono: Clock, titulo: t('agenda.hora'), valor: t('agenda.horaCdmx', { hora: selectedSlot.hora }) },
+      { Icono: Phone, titulo: t('agenda.contacto'), valor: `${form.nombre} · ${form.empresa}` },
+    ]
 
     return (
-      <div className="min-h-screen bg-white pt-24 pb-20 px-4 flex items-center">
-        <div className="max-w-lg mx-auto w-full text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/10 border border-green-500/20 mb-6">
-            <CheckCircle size={40} className="text-green-700" />
-          </div>
-          <h1 className="text-4xl font-black text-navy mb-3">{t('agenda.agendada')}</h1>
-          <p className="text-slate-600 text-lg mb-8">
-            {t('agenda.recibida')}
-          </p>
-
-          <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm text-left space-y-4 mb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center">
-                <Calendar size={16} className="text-brand" />
-              </div>
-              <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider">{t('agenda.fecha')}</p>
-                <p className="text-navy font-semibold text-sm">{fechaFormateada}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center">
-                <Clock size={16} className="text-brand" />
-              </div>
-              <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider">{t('agenda.hora')}</p>
-                <p className="text-navy font-semibold text-sm">{t('agenda.horaCdmx', { hora: selectedSlot.hora })}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center">
-                <Phone size={16} className="text-brand" />
-              </div>
-              <div>
-                <p className="text-slate-500 text-xs uppercase tracking-wider">{t('agenda.contacto')}</p>
-                <p className="text-navy font-semibold text-sm">{form.nombre} · {form.empresa}</p>
-              </div>
+      <div className="min-h-screen bg-lavanda px-5 pb-24 pt-28 sm:pt-36">
+        <div className="mx-auto w-full max-w-xl">
+          <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+            <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-violeta text-white animate-aparece">
+              <Check size={28} strokeWidth={3} aria-hidden="true" />
+            </span>
+            <div>
+              <h1 className="titular text-[clamp(1.75rem,4.5vw,2.5rem)] leading-none text-negro">{t('agenda.agendada')}</h1>
+              <p className="mt-2 text-negro/70">{t('agenda.recibida')}</p>
             </div>
           </div>
 
-          <p className="text-slate-500 text-sm">
-            {t('agenda.teContactara', { email: form.email })}
-          </p>
+          <dl className="mt-10 divide-y divide-negro/10 rounded-md bg-white">
+            {filas.map(({ Icono, titulo, valor }) => (
+              <div key={titulo} className="flex items-center gap-4 p-5">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-lavanda text-violeta">
+                  <Icono size={17} aria-hidden="true" />
+                </span>
+                <div>
+                  <dt className="text-[13px] text-negro/60">{titulo}</dt>
+                  <dd className="text-[15px] font-semibold text-negro">{valor}</dd>
+                </div>
+              </div>
+            ))}
+          </dl>
+
+          <p className="mt-6 text-[15px] leading-relaxed text-negro/70">{t('agenda.teContactara', { email: form.email })}</p>
         </div>
       </div>
     )
   }
 
+  const hayHorario = selectedSlot.fecha && selectedSlot.hora
+
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20 px-4">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-14">
-          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('agenda.etiqueta')}</span>
-          <h1 className="text-4xl sm:text-5xl font-black text-navy mb-4">{t('comun.agendarLlamadaEstrategica')}</h1>
-          <p className="text-slate-600 max-w-xl mx-auto">
-            {t('agenda.subtitulo')}
-          </p>
-        </div>
+    <div className="min-h-screen bg-white pb-24">
+      <EncabezadoPagina etiqueta={t('agenda.etiqueta')} titulo={t('comun.agendarLlamadaEstrategica')} sub={t('agenda.subtitulo')} />
 
-        <div className="flex flex-col lg:flex-row gap-10">
-          {/* Form */}
-          <div className="flex-1">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Contact */}
-              <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <h2 className="text-navy font-bold text-lg mb-5">{t('agenda.tuInfo')}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.nombreCompleto')}</label>
-                    <input
-                      type="text"
-                      name="nombre"
-                      value={form.nombre}
-                      onChange={handleChange}
-                      placeholder={t('comun.tuNombre')}
-                      className={inputClass('nombre')}
-                    />
-                    {errors.nombre && <p className="text-red-600 text-xs mt-1">{errors.nombre}</p>}
-                  </div>
-                  <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.empresa')}</label>
-                    <input
-                      type="text"
-                      name="empresa"
-                      value={form.empresa}
-                      onChange={handleChange}
-                      placeholder={t('agenda.phEmpresa')}
-                      className={inputClass('empresa')}
-                    />
-                    {errors.empresa && <p className="text-red-600 text-xs mt-1">{errors.empresa}</p>}
-                  </div>
-                  <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.email')}</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      placeholder={t('comun.phEmail')}
-                      className={inputClass('email')}
-                    />
-                    {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email}</p>}
-                  </div>
-                  <div>
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.telefono')}</label>
-                    <input
-                      type="tel"
-                      name="telefono"
-                      value={form.telefono}
-                      onChange={handleChange}
-                      placeholder="+52 55 0000 0000"
-                      className={inputClass('telefono')}
-                    />
-                    {errors.telefono && <p className="text-red-600 text-xs mt-1">{errors.telefono}</p>}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">
-                      {t('agenda.proyecto')}
-                    </label>
-                    <textarea
-                      name="mensaje"
-                      value={form.mensaje}
-                      onChange={handleChange}
-                      placeholder={t('agenda.phProyecto')}
-                      rows={3}
-                      className={`${inputClass('mensaje')} resize-none`}
-                    />
-                  </div>
-                </div>
-              </div>
+      <div className={`${contenedor} mt-14 grid gap-12 lg:grid-cols-12 lg:gap-x-8`}>
+        <form onSubmit={handleSubmit} className="space-y-12 lg:col-span-8" noValidate>
+          {/* 1. Fecha y hora: la semana completa de un vistazo */}
+          <Paso numero={1} titulo={t('agenda.seleccionaFecha')}>
+            {errors.slot && (
+              <p className="mb-4 border-l-2 border-red-600 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700" role="alert">
+                {errors.slot}
+              </p>
+            )}
 
-              {/* Slot selector */}
-              <div className="p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <h2 className="text-navy font-bold text-lg mb-5 flex items-center gap-2">
-                  <Calendar size={18} className="text-brand" />
-                  {t('agenda.seleccionaFecha')}
-                </h2>
-                {errors.slot && (
-                  <p className="text-red-600 text-xs mb-3">{errors.slot}</p>
-                )}
-                <div className="space-y-5">
-                  {slots === null && (
-                    <div className="w-6 h-6 border-2 border-brand/30 border-t-brand rounded-full animate-spin" role="status" aria-label={t('comun.cargando')} />
-                  )}
-                  {slots?.map((slot) => (
-                    <div key={slot.fecha}>
-                      <p className="text-slate-600 text-xs uppercase tracking-wider mb-2">
-                        {fecha(slot.fecha)}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {slot.horas.map((hora) => {
-                          const isSelected = selectedSlot.fecha === slot.fecha && selectedSlot.hora === hora
-                          return (
-                            <button
-                              key={hora}
-                              type="button"
-                              onClick={() => {
-                                setSelectedSlot({ fecha: slot.fecha, hora })
-                                if (errors.slot) setErrors((p) => ({ ...p, slot: '' }))
-                              }}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                isSelected
-                                  ? 'bg-brand text-white font-bold'
-                                  : 'border border-slate-200 text-slate-700 hover:border-brand/40 hover:text-brand'
-                              }`}
-                            >
-                              {hora}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {selectedSlot.fecha && selectedSlot.hora && (
-                  <div className="mt-5 p-3 rounded-lg bg-brand/5 border border-brand/15 flex items-center gap-2">
-                    <CheckCircle size={15} className="text-brand" />
-                    <p className="text-brand text-sm font-medium">
-                      {t('agenda.seleccionado', { dia: diaSemana(selectedSlot.fecha, locale), hora: selectedSlot.hora })}
+            {slots === null ? (
+              <Cargando etiqueta={t('comun.cargando')} />
+            ) : (
+              <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
+                {slots.map((slot) => (
+                  <div key={slot.fecha} role="group" aria-label={fecha(slot.fecha)}>
+                    <p className="border-b-2 border-negro pb-2 text-center">
+                      <span className="block text-xs font-medium capitalize text-negro/60">{parte(slot.fecha, locale, { weekday: 'short' }).replace('.', '')}</span>
+                      <span className="block cifra text-2xl text-negro">{parte(slot.fecha, locale, { day: 'numeric' })}</span>
+                      <span className="block text-xs capitalize text-negro/60">{parte(slot.fecha, locale, { month: 'short' }).replace('.', '')}</span>
                     </p>
+                    <div className="mt-3 space-y-1.5">
+                      {slot.horas.length === 0 && <p className="py-2 text-center text-negro/30">—</p>}
+                      {slot.horas.map((hora) => {
+                        const isSelected = selectedSlot.fecha === slot.fecha && selectedSlot.hora === hora
+                        return (
+                          <button
+                            key={hora}
+                            type="button"
+                            aria-pressed={isSelected}
+                            aria-label={`${fecha(slot.fecha)}, ${hora}`}
+                            onClick={() => {
+                              setSelectedSlot({ fecha: slot.fecha, hora })
+                              if (errors.slot) setErrors((p) => ({ ...p, slot: '' }))
+                            }}
+                            className={`w-full rounded-md py-2.5 text-[13px] font-semibold tabular-nums transition-colors duration-150 sm:text-sm ${
+                              isSelected ? 'bg-violeta text-white' : 'bg-lavanda text-violeta hover:bg-violeta/15'
+                            }`}
+                          >
+                            {hora}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white font-bold py-4 rounded-xl text-base transition-all duration-200"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    {t('agenda.confirmando')}
-                  </>
-                ) : (
-                  <>
-                    {t('agenda.confirmar')}
-                    <ArrowRight size={16} />
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
+            {hayHorario && (
+              <p className="mt-5 flex items-center gap-2.5 border-l-2 border-violeta bg-lavanda px-4 py-3 text-sm font-semibold text-violeta animate-aparece">
+                <Check size={16} aria-hidden="true" />
+                {t('agenda.seleccionado', { dia: diaSemana(selectedSlot.fecha, locale), hora: selectedSlot.hora })}
+              </p>
+            )}
+          </Paso>
 
-          {/* Info sidebar */}
-          <div className="lg:w-72">
-            <div className="sticky top-24 space-y-4">
-              <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <h3 className="text-navy font-bold mb-4">{t('agenda.queEsperar')}</h3>
-                <ul className="space-y-3">
-                  {t('agenda.esperar').map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <CheckCircle size={14} className="text-brand mt-0.5 flex-shrink-0" />
-                      <span className="text-slate-700 text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50">
-                <h3 className="text-slate-700 font-semibold text-sm mb-3">{t('agenda.tambien')}</h3>
-                <div className="space-y-2">
-                  <a href="mailto:hola@socius.mx" className="flex items-center gap-2 text-slate-600 hover:text-brand text-sm transition-colors">
-                    <Mail size={14} />
-                    hola@socius.mx
-                  </a>
-                  <a href="tel:+525512345678" className="flex items-center gap-2 text-slate-600 hover:text-brand text-sm transition-colors">
-                    <Phone size={14} />
-                    +52 55 1234 5678
-                  </a>
-                  <a href="https://wa.me/525512345678" className="flex items-center gap-2 text-slate-600 hover:text-brand text-sm transition-colors">
-                    <MessageSquare size={14} />
-                    WhatsApp
-                  </a>
+          {/* 2. Tus datos */}
+          <Paso numero={2} titulo={t('agenda.tuInfo')}>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {CAMPOS.map(({ name, label, placeholder, ...c }) => (
+                <div key={name}>
+                  <label htmlFor={`agenda-${name}`} className={etiquetaCampo}>
+                    {t(label)}
+                  </label>
+                  <input
+                    id={`agenda-${name}`}
+                    name={name}
+                    {...c}
+                    value={form[name]}
+                    onChange={handleChange}
+                    placeholder={t(placeholder)}
+                    aria-invalid={Boolean(errors[name])}
+                    className={campo(errors[name])}
+                  />
+                  {errors[name] && <p className={errorCampo}>{errors[name]}</p>}
                 </div>
+              ))}
+              <div className="sm:col-span-2">
+                <label htmlFor="agenda-mensaje" className={etiquetaCampo}>
+                  {t('agenda.proyecto')}
+                </label>
+                <textarea
+                  id="agenda-mensaje"
+                  name="mensaje"
+                  value={form.mensaje}
+                  onChange={handleChange}
+                  placeholder={t('agenda.phProyecto')}
+                  rows={3}
+                  className={`${campo(false)} resize-none`}
+                />
               </div>
             </div>
+          </Paso>
+
+          <button type="submit" disabled={loading} className={`${boton.primario} w-full py-4 text-base`}>
+            {loading ? (
+              <>
+                <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                {t('agenda.confirmando')}
+              </>
+            ) : (
+              t('agenda.confirmar')
+            )}
+          </button>
+        </form>
+
+        {/* Qué esperar */}
+        <aside className="lg:col-span-4">
+          <div className="space-y-8 lg:sticky lg:top-24">
+            <div className="rounded-md bg-negro p-6 text-white">
+              <h2 className="text-lg font-bold">{t('agenda.queEsperar')}</h2>
+              <ul className="mt-5 space-y-3.5">
+                {t('agenda.esperar').map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-[15px] text-white/85">
+                    <span aria-hidden="true" className="mt-[7px] h-2 w-2 flex-shrink-0 bg-cian" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="border-t border-negro/10 pt-6">
+              <h2 className="text-sm font-medium text-negro/60">{t('agenda.tambien')}</h2>
+              <ul className="mt-4 space-y-3">
+                {[
+                  { href: 'mailto:hola@socius.mx', Icono: Mail, texto: 'hola@socius.mx' },
+                  { href: 'tel:+525512345678', Icono: Phone, texto: '+52 55 1234 5678' },
+                  { href: 'https://wa.me/525512345678', Icono: MessageSquare, texto: 'WhatsApp' },
+                ].map(({ href, Icono, texto }) => (
+                  <li key={href}>
+                    <a href={href} className="inline-flex items-center gap-2.5 text-[15px] font-medium text-negro transition-colors hover:text-violeta">
+                      <Icono size={15} aria-hidden="true" className="text-violeta" />
+                      {texto}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   )
