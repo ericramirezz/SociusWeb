@@ -245,9 +245,9 @@ export default function Agenda() {
               <h2 className="text-sm font-medium text-negro/60">{t('agenda.tambien')}</h2>
               <ul className="mt-4 space-y-3">
                 {[
-                  { href: 'mailto:hola@socius.mx', Icono: Mail, texto: 'hola@socius.mx' },
-                  { href: 'tel:+525512345678', Icono: Phone, texto: '+52 55 1234 5678' },
-                  { href: 'https://wa.me/525512345678', Icono: MessageSquare, texto: 'WhatsApp' },
+                  { href: 'mailto:admin@sociusrealestate.com', Icono: Mail, texto: 'admin@sociusrealestate.com' },
+                  { href: 'tel:+525536711555', Icono: Phone, texto: '+52 55 3671 1555' },
+                  { href: 'https://wa.me/525536711555', Icono: MessageSquare, texto: 'WhatsApp' },
                 ].map(({ href, Icono, texto }) => (
                   <li key={href}>
                     <a href={href} className="inline-flex items-center gap-2.5 text-[15px] font-medium text-negro transition-colors hover:text-violeta">

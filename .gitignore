@@ -7,3 +7,6 @@ dist
 .DS_Store
 Thumbs.db
 supabase/.temp/
+
+# Archivos originales de marca (se copian a public/marca/ solo los que usa la página)
+marca-original/

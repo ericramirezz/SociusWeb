@@ -1,9 +1,10 @@
-Logos oficiales de Socius (carpeta de marca).
+Logos oficiales de Socius usados por la página (generados del PNG transparente
+"logo socius transparente.png" de la carpeta de marca, solo recortados y escalados):
 
-Guarda aquí, con estos nombres exactos:
-  socius-logo.svg         -> versión a color, para fondos claros (barra superior)
-  socius-logo-blanco.svg  -> versión en blanco, para fondos oscuros (pie de página)
+  socius-logo.png          -> a color, fondos claros (barra superior)
+  socius-logo-blanco.png   -> en blanco, fondos oscuros (pie de página)
+  socius-logo-correo.png   -> a color, encabezado de los correos de acceso (Supabase)
+  socius-icono.png         -> el infinito solo; también ../favicon.png y ../apple-touch-icon.png
 
-Si usas PNG, cambia la extensión en src/components/Logo.jsx.
-El brief pide no tipear "SOCIUS" ni redibujar el infinito: mientras falten
-estos archivos, la página muestra un texto provisional.
+Los originales (PNG, JPG y el Manual de identidad) viven en marca-original/, fuera del repo.
+Si llega una versión SVG oficial, cambia la extensión en src/components/Logo.jsx.

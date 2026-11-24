@@ -5,8 +5,8 @@ import { useState } from 'react'
 // public/marca/ con estos nombres y aparecerán solos en la barra y el pie de página.
 // Mientras no estén, se muestra un texto provisional.
 const ARCHIVOS = {
-  color: '/marca/socius-logo.svg',
-  blanco: '/marca/socius-logo-blanco.svg',
+  color: '/marca/socius-logo.png',
+  blanco: '/marca/socius-logo-blanco.png',
 }
 
 export default function Logo({ variante = 'color', className = 'h-8' }) {
