@@ -227,9 +227,16 @@ Cada pantalla se lee como un plano de arquitectura (el mundo de nuestros cliente
 - **Tema 4 · Herramientas:** React como librería de frontend para SPA; pruebas unitarias como primera línea de defensa y pruebas de interfaz automatizadas; Git/GitHub; CI/CD y PaaS para el despliegue; APIs REST con versionado, autenticación por llaves y validación de datos; Postman para probar las APIs de pago.
 - **Tema 6 · Calidad:** ISO/IEC 25010 (fiabilidad, seguridad, mantenibilidad) como criterios; pruebas funcionales, no funcionales y estructurales (ISTQB); "shift left": seguridad y pruebas desde el inicio; Scrum con sprints cortos y entregas incrementales.
 
+## Publicación
+
+- **Sitio:** https://app.sociusrealestate.com, en **Netlify** (plan gratis), conectado al repo: cada push a `main` compila (`netlify.toml`) y publica solo. Las variables `VITE_…` viven en Netlify → Environment variables; si cambian, hay que volver a publicar (Deploys → Trigger deploy).
+- **Dominio:** `sociusrealestate.com` sigue en GoDaddy; el subdominio `app` es un CNAME a `socius-web.netlify.app`. El HTTPS lo pone Netlify (Let's Encrypt).
+- **Supabase:** `ORIGENES_PERMITIDOS` (secreto de `crear-pago`) y Authentication → URL Configuration incluyen `https://app.sociusrealestate.com`.
+- **Correo de acceso:** SMTP propio con **Resend** desde `no-reply@correo.sociusrealestate.com` (subdominio `correo`: DKIM y SPF en GoDaddy, sin tocar el correo de Google Workspace del dominio principal). Supabase → Authentication → Emails → SMTP Settings; límite de envíos en Rate Limits.
+- Netlify publica solo la **página**: los cambios a `src/core` que usan las funciones (`npm run build:funciones` + `npx supabase functions deploy`) y las migraciones (SQL Editor) se aplican aparte.
+
 ## Pendiente
 
-1. Correr la migración 004 (quita las políticas TEMPORAL de la 001: solo el servidor marca pagos y reembolsos). Stripe, Mercado Pago y PayPal ya cobran y reembolsan en modo prueba.
-2. Panel de Socius para ver las solicitudes de reembolso (función 7 del backlog); mientras, se revisan en Supabase (`ordenes.reembolso->>estado = 'solicitado'`).
-3. Correo propio (SMTP) para el enlace de acceso antes de la demo.
-4. Documento final, presentación con mockup, diagrama de contexto y demo.
+1. Panel de Socius para ver las solicitudes de reembolso (función 7 del backlog); mientras, se revisan en Supabase (`ordenes.reembolso->>estado = 'solicitado'`).
+2. Logos oficiales en `public/marca/` (ver `LEEME.txt`).
+3. Documento final, presentación con mockup, diagrama de contexto y demo.
