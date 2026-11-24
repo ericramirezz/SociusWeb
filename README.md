@@ -233,6 +233,8 @@ Cada pantalla se lee como un plano de arquitectura (el mundo de nuestros cliente
 - **Dominio:** `sociusrealestate.com` sigue en GoDaddy; el subdominio `app` es un CNAME a `socius-web.netlify.app`. El HTTPS lo pone Netlify (Let's Encrypt).
 - **Supabase:** `ORIGENES_PERMITIDOS` (secreto de `crear-pago`) y Authentication → URL Configuration incluyen `https://app.sociusrealestate.com`.
 - **Correo de acceso:** SMTP propio con **Resend** desde `no-reply@correo.sociusrealestate.com` (subdominio `correo`: DKIM y SPF en GoDaddy, sin tocar el correo de Google Workspace del dominio principal). Supabase → Authentication → Emails → SMTP Settings; límite de envíos en Rate Limits.
+- **Aviso de llamadas:** al agendar, un Database Webhook de Supabase (tabla `llamadas`, Insert) llama a la Edge Function `aviso-llamada`, que manda un correo a `team@sociusrealestate.com` por Resend (responder le escribe al prospecto). Secretos: `RESEND_API_KEY`, `AVISO_LLAMADA_SECRETO` (va también en el encabezado `x-aviso-secreto` del webhook). Lógica y pruebas en `src/core/avisos/` (CP-52 a CP-55).
+- Publicar funciones sin Docker y con espacios en la ruta: `npx supabase functions deploy <función> --use-api`.
 - Netlify publica solo la **página**: los cambios a `src/core` que usan las funciones (`npm run build:funciones` + `npx supabase functions deploy`) y las migraciones (SQL Editor) se aplican aparte.
 
 ## Pendiente

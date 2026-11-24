@@ -37,7 +37,7 @@ export function correoLlamada(llamada) {
     ['Teléfono', llamada.telefono],
     ['Mensaje', llamada.mensaje || '—'],
   ]
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#111021;max-width:520px">
+  const html = `<div lang="es" style="font-family:Arial,Helvetica,sans-serif;color:#111021;max-width:520px">
   <h2 style="margin:0 0 4px;color:#5348CF">Nueva llamada agendada</h2>
   <p style="margin:0 0 16px;color:#3a3950">Un prospecto agendó una llamada estratégica desde app.sociusrealestate.com.</p>
   <table style="border-collapse:collapse;width:100%;font-size:14px">

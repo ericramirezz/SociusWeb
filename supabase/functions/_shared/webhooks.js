@@ -1172,7 +1172,7 @@ function correoLlamada(llamada) {
     ["Tel\xE9fono", llamada.telefono],
     ["Mensaje", llamada.mensaje || "\u2014"]
   ];
-  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#111021;max-width:520px">
+  const html = `<div lang="es" style="font-family:Arial,Helvetica,sans-serif;color:#111021;max-width:520px">
   <h2 style="margin:0 0 4px;color:#5348CF">Nueva llamada agendada</h2>
   <p style="margin:0 0 16px;color:#3a3950">Un prospecto agend\xF3 una llamada estrat\xE9gica desde app.sociusrealestate.com.</p>
   <table style="border-collapse:collapse;width:100%;font-size:14px">
