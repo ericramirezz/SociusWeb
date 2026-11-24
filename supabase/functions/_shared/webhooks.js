@@ -1151,6 +1151,77 @@ async function aplicar(evento, servicio, consultores) {
   });
 }
 
+// src/core/avisos/avisoLlamada.js
+var API_RESEND = "https://api.resend.com/emails";
+var escapar = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+var DIAS = ["domingo", "lunes", "martes", "mi\xE9rcoles", "jueves", "viernes", "s\xE1bado"];
+var MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function fechaLarga(fechaISO) {
+  const [a, m, d] = String(fechaISO).split("-").map(Number);
+  if (!a || !m || !d) return String(fechaISO ?? "");
+  const dia = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+  return `${DIAS[dia]} ${d} de ${MESES[m - 1]} de ${a}`;
+}
+function correoLlamada(llamada) {
+  const cuando = `${fechaLarga(llamada.fecha)} a las ${llamada.hora} (hora CDMX)`;
+  const filas = [
+    ["Cu\xE1ndo", cuando],
+    ["Nombre", llamada.nombre],
+    ["Empresa", llamada.empresa],
+    ["Correo", llamada.email],
+    ["Tel\xE9fono", llamada.telefono],
+    ["Mensaje", llamada.mensaje || "\u2014"]
+  ];
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#111021;max-width:520px">
+  <h2 style="margin:0 0 4px;color:#5348CF">Nueva llamada agendada</h2>
+  <p style="margin:0 0 16px;color:#3a3950">Un prospecto agend\xF3 una llamada estrat\xE9gica desde app.sociusrealestate.com.</p>
+  <table style="border-collapse:collapse;width:100%;font-size:14px">
+    ${filas.map(([k, v]) => `<tr><td style="padding:8px 12px 8px 0;color:#6b6a7d;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:8px 0;border-bottom:1px solid #EFECFD">${escapar(v)}</td></tr>`).join("\n    ")}
+  </table>
+  <p style="margin:16px 0 0;font-size:13px;color:#6b6a7d">Responde a este correo para escribirle directo al prospecto.</p>
+</div>`;
+  const texto2 = ["Nueva llamada agendada", ...filas.map(([k, v]) => `${k}: ${v ?? ""}`)].join("\n");
+  return { asunto: `Llamada agendada: ${llamada.nombre} (${llamada.empresa}) \xB7 ${cuando}`, html, texto: texto2 };
+}
+async function avisarLlamada({ cuerpo, encabezados = {}, config = {}, fetch = globalThis.fetch }) {
+  const { secreto, llaveResend, para, de } = config;
+  if (!secreto || !llaveResend || !para || !de) return { status: 500, motivo: "falta_configuracion" };
+  const enc = Object.fromEntries(Object.entries(encabezados).map(([k, v]) => [k.toLowerCase(), v]));
+  if (!igualSeguro(String(enc["x-aviso-secreto"] ?? ""), secreto)) return { status: 401, motivo: "secreto_invalido" };
+  let datos;
+  try {
+    datos = JSON.parse(cuerpo);
+  } catch {
+    return { status: 400, motivo: "json_invalido" };
+  }
+  if (datos?.type !== "INSERT" || datos?.table !== "llamadas" || !datos.record) return { status: 204, motivo: "ignorado" };
+  const llamada = datos.record;
+  const { asunto, html, texto: texto2 } = correoLlamada(llamada);
+  const r = await fetch(API_RESEND, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${llaveResend}`,
+      "Content-Type": "application/json",
+      // Si Supabase reintenta el mismo aviso, Resend no manda el correo dos veces.
+      "Idempotency-Key": `llamada-${llamada.id ?? `${llamada.fecha}-${llamada.hora}`}`
+    },
+    body: JSON.stringify({
+      from: de,
+      to: [para],
+      reply_to: llamada.email || void 0,
+      subject: asunto,
+      html,
+      text: texto2
+    })
+  });
+  if (!r.ok) {
+    const detalle = await r.text().catch(() => "");
+    return { status: 502, motivo: `resend_${r.status}`, detalle };
+  }
+  const { id } = await r.json().catch(() => ({}));
+  return { status: 200, motivo: "enviado", id };
+}
+
 // src/core/webhooks/servidor.js
 function crearServicioServidor(cliente) {
   const repo = new RepositorioPedidosSupabase(cliente);
@@ -1166,6 +1237,7 @@ function crearServicioServidor(cliente) {
 export {
   ColaEventosSupabase,
   RepositorioPedidosSupabase,
+  avisarLlamada,
   capturarOrdenPayPal,
   consultarPagoMercadoPago,
   crearPago,
