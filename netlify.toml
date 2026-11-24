@@ -1,0 +1,12 @@
+# Hosting en Netlify (el dominio sigue en GoDaddy: un CNAME apunta aquí).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# La app usa BrowserRouter: cualquier ruta (/confirmacion, /pedidos, /entrar…)
+# se sirve con index.html y React decide qué página mostrar.
+# Sin esto, al volver de la pasarela o al recargar sale 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
