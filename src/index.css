@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Lenguaje visual "lámina": cada página se lee como un plano de arquitectura.
+  Líneas finas para separar, cotas para medir lo que importa (tiempo, pasos)
+  y el bloque violeta como unidad: una venta, un piso, un paso de la máquina.
+  Identidad del Brief v1.0: Violeta #5348CF, Cian #659FFB, Lavanda #EFECFD, Negro #111021;
+  titulares en Space Grotesk (mayúsculas) y cuerpo en Outfit.
+*/
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -9,46 +17,114 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-white text-navy font-sans antialiased;
+    @apply bg-white text-negro font-sans antialiased;
     margin: 0;
     padding: 0;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: #efecfd;
+    color: #111021;
+  }
+
+  /* Foco visible solo con teclado, en todos los controles. */
+  :focus-visible {
+    outline: 2px solid #5348cf;
+    outline-offset: 3px;
+    border-radius: 4px;
   }
 
   ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #eff6ff;
+    background: #efecfd;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #1d4ed8;
+    background: #5348cf;
     border-radius: 3px;
   }
 }
 
+@layer components {
+  /* Titulares de marca: Space Grotesk, en mayúsculas. */
+  .titular {
+    @apply font-display font-bold uppercase tracking-titular;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+
+  /* Cifras grandes: misma familia que los titulares, con números tabulares. */
+  .cifra {
+    @apply font-display font-bold tabular-nums tracking-titular;
+  }
+}
+
 @layer utilities {
-  .gradient-hero {
-    background: linear-gradient(160deg, #ffffff 0%, #eff6ff 55%, #dbeafe 100%);
+  /* Cuadrícula de plano: 12 columnas por 3 filas, como papel milimétrico. */
+  .plano {
+    background-image:
+      linear-gradient(to right, rgb(83 72 207 / 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(83 72 207 / 0.1) 1px, transparent 1px);
+    background-size: calc(100% / 12) calc(100% / 3);
   }
 
-  .brand-gradient {
-    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Cianotipo: la retícula en blanco sobre el azul de marca. */
+  .plano-claro {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.08) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: -1px -1px;
   }
 
-  .card-hover {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  /* Retícula tenue detrás de la cita destacada en testimonios. */
+  .plano-voz {
+    background-image:
+      linear-gradient(to right, rgb(83 72 207 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(83 72 207 / 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: -1px -1px;
   }
 
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px rgba(29, 78, 216, 0.12);
+  /* Pisos de un edificio: una línea cada 28 px. */
+  .pisos {
+    background-image: repeating-linear-gradient(to bottom, transparent 0 27px, rgb(255 255 255 / 0.14) 27px 28px);
+  }
+
+  .pisos-oscuros {
+    background-image: repeating-linear-gradient(to bottom, transparent 0 27px, rgb(83 72 207 / 0.14) 27px 28px);
+  }
+
+  .sin-barra {
+    scrollbar-width: none;
+  }
+
+  .sin-barra::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Quien pide menos movimiento ve todo en su estado final. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }

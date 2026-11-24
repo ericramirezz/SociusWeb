@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, ArrowRight, AlertCircle, Trash2 } from 'lucide-react'
+import { ShoppingCart, AlertCircle, Trash2 } from 'lucide-react'
 import { programas } from '../data/programas'
 import { pedidos, seleccion, formatoMoneda } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
 import ProgramaCard from '../components/ProgramaCard'
+import { EncabezadoPagina } from '../components/Lamina'
+import { boton, contenedor } from '../components/estilos'
 
 export default function Cotizador() {
   const navigate = useNavigate()
@@ -34,6 +36,7 @@ export default function Cotizador() {
   // La fachada cotiza: forma de pago (Strategy) y fecha de entrega por tipo de producto.
   const cotizacion = pedidos.cotizar(seleccionados, ocupacion)
   const programasSeleccionados = cotizacion.partidas
+  const hayAlgo = programasSeleccionados.length > 0
 
   const handleIrAPago = () => {
     if (seleccionados.length === 0) return
@@ -41,121 +44,118 @@ export default function Cotizador() {
   }
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-10">
-          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-2 block">{t('cotizador.etiqueta')}</span>
-          <h1 className="text-4xl font-black text-navy">{t('cotizador.titulo')}</h1>
-          <p className="text-slate-600 mt-2">{t('cotizador.subtitulo')}</p>
+    <div className={`min-h-screen bg-white ${hayAlgo ? 'pb-36 lg:pb-24' : 'pb-24'}`}>
+      <EncabezadoPagina etiqueta={t('cotizador.etiqueta')} titulo={t('cotizador.titulo')} sub={t('cotizador.subtitulo')} />
+
+      <div className={`${contenedor} mt-14 grid gap-10 lg:grid-cols-12 lg:gap-x-8`}>
+        {/* Programas: se marcan como casillas */}
+        <div className="space-y-3 lg:col-span-7 lg:col-start-1">
+          {programas.map((p) => (
+            <ProgramaCard key={p.id} programa={p} seleccionado={seleccionados.includes(p.id)} onToggle={togglePrograma} modo="cotizador" />
+          ))}
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Programs grid */}
-          <div className="flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {programas.map((p) => (
-                <ProgramaCard
-                  key={p.id}
-                  programa={p}
-                  seleccionado={seleccionados.includes(p.id)}
-                  onToggle={togglePrograma}
-                  modo="cotizador"
-                />
-              ))}
-            </div>
-          </div>
+        {/* Hoja de cotización */}
+        <aside className="lg:col-span-5 lg:col-start-8 xl:col-span-4 xl:col-start-9">
+          <div className="lg:sticky lg:top-24">
+            <div className="rounded-md border border-negro/10 bg-white">
+              <div className="flex items-center gap-2.5 border-b border-negro/10 px-5 py-4">
+                <ShoppingCart size={18} aria-hidden="true" className="text-violeta" />
+                <h2 className="font-bold text-negro">{t('cotizador.resumen')}</h2>
+              </div>
 
-          {/* Sidebar */}
-          <div className="lg:w-80 xl:w-96">
-            <div className="sticky top-24">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                {/* Header */}
-                <div className="p-5 border-b border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart size={18} className="text-brand" />
-                    <h2 className="text-navy font-bold">{t('cotizador.resumen')}</h2>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="p-5 min-h-[200px]">
-                  {programasSeleccionados.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
-                        <ShoppingCart size={20} className="text-slate-400" />
-                      </div>
-                      <p className="text-slate-500 text-sm">{t('cotizador.vacio')}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {programasSeleccionados.map(({ producto: p, cobro }) => (
-                        <div key={p.id} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-slate-50">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-navy text-sm font-medium truncate">{p.nombre}</p>
-                            <p className="text-brand text-sm font-bold">{formatoMoneda(cobro.hoy)} {t('cotizador.hoy')}</p>
-                            <p className="text-slate-500 text-xs">{detalleCobro(p.id)}</p>
-                          </div>
-                          <button
-                            onClick={() => removePrograma(p.id)}
-                            className="text-slate-400 hover:text-red-600 transition-colors mt-0.5"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+              <div className="px-5 py-4">
+                {!hayAlgo ? (
+                  <div className="py-8 text-center">
+                    {/* Doce casillas vacías (4×3, como el edificio de la portada): aún no hay bloques */}
+                    <div aria-hidden="true" className="mx-auto mb-4 grid w-20 grid-cols-4 gap-1">
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <span key={i} className="aspect-square border border-dashed border-violeta/30" />
                       ))}
                     </div>
-                  )}
-                </div>
-
-                {/* Total */}
-                {programasSeleccionados.length > 0 && (
-                  <div className="border-t border-slate-200 p-5">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-slate-600 text-sm">{t('cotizador.aPagarHoy')}</span>
-                      <span className="text-navy font-bold">{formatoMoneda(cotizacion.totalHoy)} MXN</span>
-                    </div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-slate-600 text-sm">{t('cotizador.valorTotal')}</span>
-                      <span className="text-slate-700 text-sm">{formatoMoneda(cotizacion.totalContrato)} MXN</span>
-                    </div>
-                    <div className="p-3 rounded-lg bg-brand-soft border border-brand/15 mb-3">
-                      <p className="text-brand text-xs font-semibold uppercase tracking-wider mb-1">{t('cotizador.fechaPropuesta')}</p>
-                      {cotizacion.requiereAgenda ? (
-                        <p className="text-navy text-sm">
-                          {t('cotizador.arranqueEl')} <strong>{fecha(cotizacion.entregaPropuesta.fechaArranque)}</strong>; {t('cotizador.primeraVersion')}{' '}
-                          <strong>{fecha(cotizacion.entregaPropuesta.fechaEntrega)}</strong>. {t('cotizador.puedesProponer')}
+                    <p className="text-sm text-negro/60">{t('cotizador.vacio')}</p>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-negro/10">
+                    {programasSeleccionados.map(({ producto: p, cobro }) => (
+                      <li key={p.id} className="flex items-start justify-between gap-3 py-3 first:pt-1">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[15px] font-semibold text-negro">{p.nombre}</p>
+                          <p className="mt-0.5 text-[13px] leading-snug text-negro/60">{detalleCobro(p.id)}</p>
+                        </div>
+                        <p className="whitespace-nowrap text-right text-sm font-bold text-negro tabular-nums">
+                          {formatoMoneda(cobro.hoy)} <span className="font-medium text-negro/60">{t('cotizador.hoy')}</span>
                         </p>
-                      ) : (
-                        <p className="text-navy text-sm">{t('cotizador.accesoInmediato')}</p>
-                      )}
-                    </div>
-                    <p className="text-slate-400 text-xs mb-5">{t('cotizador.sinPublicidad')}</p>
-
-                    <button
-                      onClick={handleIrAPago}
-                      className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl text-sm transition-all duration-200"
-                    >
-                      {t('cotizador.irPago')}
-                      <ArrowRight size={16} />
-                    </button>
-                  </div>
+                        <button
+                          onClick={() => removePrograma(p.id)}
+                          className="-mr-1 rounded-md p-1 text-negro/50 transition-colors hover:bg-lavanda hover:text-negro"
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-
-                {/* Note */}
-                <div className="px-5 pb-5">
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
-                    <AlertCircle size={14} className="text-brand mt-0.5 flex-shrink-0" />
-                    <p className="text-slate-500 text-xs leading-relaxed">
-                      {t('cotizador.notaPublicidad1')} <span className="text-slate-700">{t('cotizador.notaPublicidad2')}</span> {t('cotizador.notaPublicidad3')}
-                    </p>
-                  </div>
-                </div>
               </div>
+
+              {hayAlgo && (
+                <div className="border-t border-negro/10 px-5 py-5">
+                  <dl className="space-y-2">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <dt className="text-sm text-negro/70">{t('cotizador.valorTotal')}</dt>
+                      <dd className="text-sm text-negro/80 tabular-nums">{formatoMoneda(cotizacion.totalContrato)} MXN</dd>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-4 border-t border-dashed border-negro/15 pt-3">
+                      <dt className="font-bold text-negro">{t('cotizador.aPagarHoy')}</dt>
+                      <dd className="cifra text-2xl text-negro">{formatoMoneda(cotizacion.totalHoy)} MXN</dd>
+                    </div>
+                  </dl>
+
+                  <div className="mt-5 border-l-2 border-violeta bg-lavanda px-4 py-3">
+                    <p className="text-[13px] font-semibold text-violeta">{t('cotizador.fechaPropuesta')}</p>
+                    {cotizacion.requiereAgenda ? (
+                      <p className="mt-1 text-sm leading-relaxed text-negro">
+                        {t('cotizador.arranqueEl')} <strong>{fecha(cotizacion.entregaPropuesta.fechaArranque)}</strong>; {t('cotizador.primeraVersion')}{' '}
+                        <strong>{fecha(cotizacion.entregaPropuesta.fechaEntrega)}</strong>. {t('cotizador.puedesProponer')}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-negro">{t('cotizador.accesoInmediato')}</p>
+                    )}
+                  </div>
+                  <p className="mt-3 text-xs text-negro/60">{t('cotizador.sinPublicidad')}</p>
+
+                  <button onClick={handleIrAPago} className={`${boton.primario} mt-5 hidden w-full lg:flex`}>
+                    {t('cotizador.irPago')}
+                  </button>
+                </div>
+              )}
             </div>
+
+            <p className="mt-4 flex items-start gap-2 text-[13px] leading-relaxed text-negro/60">
+              <AlertCircle size={14} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-violeta" />
+              <span>
+                {t('cotizador.notaPublicidad1')} <span className="font-semibold text-negro/80">{t('cotizador.notaPublicidad2')}</span>{' '}
+                {t('cotizador.notaPublicidad3')}
+              </span>
+            </p>
+          </div>
+        </aside>
+      </div>
+
+      {/* Móvil: el total y el siguiente paso siempre a la mano */}
+      {hayAlgo && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-negro/10 bg-white/95 backdrop-blur-md lg:hidden">
+          <div className={`${contenedor} flex items-center justify-between gap-4 py-3`}>
+            <div>
+              <p className="text-xs text-negro/60">{t('cotizador.aPagarHoy')}</p>
+              <p className="cifra text-lg text-negro">{formatoMoneda(cotizacion.totalHoy)} MXN</p>
+            </div>
+            <button onClick={handleIrAPago} className={boton.primario}>
+              {t('cotizador.irPago')}
+            </button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Quote, Play } from 'lucide-react'
+import { useId, useState } from 'react'
+import { Play, Star } from 'lucide-react'
 import Modal from './Modal'
 import { localizar, useIdioma } from '../i18n/IdiomaContext'
 
@@ -13,7 +13,7 @@ export function urlEmbed(url) {
   return null
 }
 
-function iniciales(nombre) {
+export function iniciales(nombre) {
   return nombre
     .split(' ')
     .slice(0, 2)
@@ -22,7 +22,8 @@ function iniciales(nombre) {
     .toUpperCase()
 }
 
-function Avatar({ foto, autor }) {
+// Foto del cliente o, si no hay, sus iniciales sobre el degradado de marca (forma, no texto).
+export function Avatar({ foto, autor, tamano = 'h-11 w-11 text-sm' }) {
   const { t } = useIdioma()
   const [error, setError] = useState(false)
   if (foto && !error) {
@@ -32,17 +33,34 @@ function Avatar({ foto, autor }) {
         alt={t('testimonios.foto', { autor })}
         loading="lazy"
         onError={() => setError(true)}
-        className="w-11 h-11 rounded-full object-cover border border-slate-200"
+        className={`${tamano} flex-shrink-0 rounded-md object-cover`}
       />
     )
   }
   return (
-    <div className="w-11 h-11 rounded-full bg-brand/10 text-brand flex items-center justify-center text-sm font-bold">
+    <span aria-hidden="true" className={`${tamano} flex flex-shrink-0 items-center justify-center rounded-md bg-degradado font-display font-bold text-white`}>
       {iniciales(autor)}
-    </div>
+    </span>
   )
 }
 
+// Comillas hechas de bloques: el mismo módulo de la portada, con el degradado violeta → cian.
+function Comillas() {
+  const id = useId()
+  return (
+    <svg aria-hidden="true" viewBox="0 0 64 44" className="h-10 w-auto rotate-180 self-start sm:h-12">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#5348CF" />
+          <stop offset="1" stopColor="#659FFB" />
+        </linearGradient>
+      </defs>
+      <path d="M0 0h26v26L15 44H5l7-18H0zM36 0h26v26L51 44H41l7-18H36z" fill={`url(#${id})`} />
+    </svg>
+  )
+}
+
+// Testimonio destacado: la cita a tamaño grande, con autor, calificación y video si lo hay.
 export default function TestimonioCard({ testimonio }) {
   const { idioma, t: tr } = useIdioma()
   const t = localizar(testimonio, idioma)
@@ -51,43 +69,44 @@ export default function TestimonioCard({ testimonio }) {
   const portada = t.poster || t.foto
 
   return (
-    <div className="flex flex-col p-6 rounded-2xl border border-slate-200 bg-slate-50 hover:border-brand/20 transition-all duration-300 card-hover">
+    <figure className="flex h-full flex-col">
+      <Comillas />
+      <blockquote className="mt-8 text-[clamp(1.3rem,2.3vw,1.9rem)] font-light leading-[1.4] text-negro">{t.texto}</blockquote>
+
       {t.video && (
         <button
           type="button"
           onClick={() => setVideoAbierto(true)}
-          className="group relative mb-5 aspect-video w-full overflow-hidden rounded-xl bg-navy/90"
+          className="group relative mt-8 aspect-video w-full max-w-md overflow-hidden rounded-md bg-negro"
           aria-label={tr('testimonios.verVideo', { autor: t.autor })}
         >
           {portada && (
-            <img src={portada} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-70" />
+            <img src={portada} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-70 transition-opacity duration-300 group-hover:opacity-90" />
           )}
           <span className="absolute inset-0 flex items-center justify-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-brand shadow-lg transition-transform duration-200 group-hover:scale-110">
-              <Play size={22} className="ml-1" fill="currentColor" />
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-violeta transition-transform duration-200 group-hover:scale-105">
+              <Play size={22} className="ml-1" fill="currentColor" aria-hidden="true" />
             </span>
           </span>
         </button>
       )}
 
-      <Quote size={24} className="text-brand/40 mb-4" />
-      <p className="text-slate-700 text-sm leading-relaxed mb-6 flex-1">"{t.texto}"</p>
-      <div className="flex items-center gap-1 mb-4">
-        {Array.from({ length: t.rating }).map((_, j) => (
-          <span key={j} className="text-brand text-xs">★</span>
-        ))}
-      </div>
-      <div className="flex items-center gap-3">
-        <Avatar foto={t.foto} autor={t.autor} />
-        <div>
-          <p className="text-navy font-semibold text-sm">{t.autor}</p>
-          <p className="text-slate-500 text-xs mt-0.5">{t.cargo}</p>
+      <figcaption className="mt-auto flex flex-wrap items-center gap-4 pt-10">
+        <Avatar foto={t.foto} autor={t.autor} tamano="h-14 w-14 text-lg" />
+        <div className="min-w-0 flex-1">
+          <p className="text-lg font-semibold text-negro">{t.autor}</p>
+          <p className="text-[15px] text-negro/60">{t.cargo}</p>
         </div>
-      </div>
+        <span role="img" className="flex gap-0.5 text-violeta" aria-label={`${t.rating}/5`}>
+          {Array.from({ length: t.rating }).map((_, j) => (
+            <Star key={j} size={15} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+          ))}
+        </span>
+      </figcaption>
 
       {t.video && (
         <Modal isOpen={videoAbierto} onClose={() => setVideoAbierto(false)} title={t.autor} size="lg">
-          <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+          <div className="aspect-video w-full overflow-hidden rounded-md bg-negro">
             {embed ? (
               <iframe
                 src={embed}
@@ -102,6 +121,6 @@ export default function TestimonioCard({ testimonio }) {
           </div>
         </Modal>
       )}
-    </div>
+    </figure>
   )
 }

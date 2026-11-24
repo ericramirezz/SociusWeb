@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Mail, ArrowRight, CheckCircle, AlertCircle, LogOut, Package } from 'lucide-react'
+import { Mail, AlertCircle, LogOut, Package, Check } from 'lucide-react'
 import { ERRORES_SESION } from '../core'
 import { useSesion } from '../sesion/SesionContext'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { Cargando, EncabezadoPagina } from '../components/Lamina'
+import { boton, campo, contenedor, etiquetaCampo } from '../components/estilos'
 
 // Solo rutas internas ("/pedidos"); evita que un enlace manipulado mande a otro sitio.
 const rutaSegura = (r) => (r && r.startsWith('/') && !r.startsWith('//') ? r : null)
@@ -39,33 +41,36 @@ export default function Entrar() {
     }[r.error] ?? t('entrar.errorGeneral'))
   }
 
-  const tarjeta = 'w-full max-w-md mx-auto p-8 rounded-2xl border border-slate-200 bg-white shadow-sm'
+  const tarjeta = 'w-full rounded-md border border-negro/10 bg-white p-6 sm:p-8'
+  const icono = 'mb-5 flex h-12 w-12 items-center justify-center rounded-md'
 
   let contenido
   if (!disponible) {
     contenido = (
       <div className={tarjeta}>
-        <p className="flex items-start gap-2 text-slate-700 text-sm">
-          <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+        <p className="flex items-start gap-2.5 text-[15px] leading-relaxed text-negro/80">
+          <AlertCircle size={17} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-violeta" />
           {t('entrar.noDisponible')}
         </p>
       </div>
     )
   } else if (cargando) {
-    contenido = <div className="w-8 h-8 mx-auto border-2 border-brand/30 border-t-brand rounded-full animate-spin" aria-label={t('comun.procesando')} />
+    contenido = <Cargando etiqueta={t('comun.procesando')} />
   } else if (usuario) {
     contenido = (
-      <div className={`${tarjeta} text-center`}>
-        <CheckCircle size={36} className="mx-auto text-green-700 mb-4" />
-        <p className="text-navy font-bold text-lg mb-1">{t('entrar.yaDentro')}</p>
-        <p className="text-slate-600 text-sm mb-6 break-all">{usuario.email}</p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link to="/pedidos" className="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-bold py-3 rounded-xl text-sm transition-colors">
-            <Package size={15} />
+      <div className={tarjeta}>
+        <span className={`${icono} bg-violeta text-white`}>
+          <Check size={22} strokeWidth={3} aria-hidden="true" />
+        </span>
+        <p className="text-lg font-bold text-negro">{t('entrar.yaDentro')}</p>
+        <p className="mt-1 break-all text-[15px] text-negro/70">{usuario.email}</p>
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <Link to="/pedidos" className={`${boton.primario} flex-1`}>
+            <Package size={16} aria-hidden="true" />
             {t('nav.pedidos')}
           </Link>
-          <button onClick={salir} className="flex-1 flex items-center justify-center gap-2 border border-slate-300 text-slate-700 hover:text-navy font-medium py-3 rounded-xl text-sm transition-colors">
-            <LogOut size={15} />
+          <button onClick={salir} className={`${boton.secundario} flex-1`}>
+            <LogOut size={16} aria-hidden="true" />
             {t('nav.salir')}
           </button>
         </div>
@@ -73,13 +78,15 @@ export default function Entrar() {
     )
   } else if (enviado) {
     contenido = (
-      <div className={`${tarjeta} text-center`} role="status">
-        <Mail size={36} className="mx-auto text-brand mb-4" />
-        <p className="text-navy font-bold text-lg mb-2">{t('entrar.revisaCorreo')}</p>
-        <p className="text-slate-600 text-sm mb-1">{t('entrar.enviadoA')}</p>
-        <p className="text-navy font-semibold text-sm mb-5 break-all">{email.trim().toLowerCase()}</p>
-        <p className="text-slate-500 text-xs mb-6">{t('entrar.abreEnlace')}</p>
-        <button onClick={() => setEnviado(false)} className="text-brand text-sm font-semibold hover:text-brand-dark">
+      <div className={tarjeta} role="status">
+        <span className={`${icono} bg-lavanda text-violeta`}>
+          <Mail size={22} aria-hidden="true" />
+        </span>
+        <p className="text-lg font-bold text-negro">{t('entrar.revisaCorreo')}</p>
+        <p className="mt-2 text-[15px] text-negro/70">{t('entrar.enviadoA')}</p>
+        <p className="mt-1 break-all text-[15px] font-semibold text-negro">{email.trim().toLowerCase()}</p>
+        <p className="mt-5 text-[13px] leading-relaxed text-negro/60">{t('entrar.abreEnlace')}</p>
+        <button onClick={() => setEnviado(false)} className={`${boton.texto} mt-6 text-sm`}>
           {t('entrar.otroCorreo')}
         </button>
       </div>
@@ -87,7 +94,9 @@ export default function Entrar() {
   } else {
     contenido = (
       <form onSubmit={enviar} className={tarjeta} noValidate>
-        <label htmlFor="email-entrar" className="text-slate-600 text-xs uppercase tracking-wider mb-2 block">{t('comun.email')}</label>
+        <label htmlFor="email-entrar" className={etiquetaCampo}>
+          {t('comun.email')}
+        </label>
         <input
           id="email-entrar"
           type="email"
@@ -95,30 +104,28 @@ export default function Entrar() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder={t('comun.phEmail')}
-          className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3 text-navy text-sm placeholder-slate-400 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/15"
+          aria-invalid={Boolean(error)}
+          className={campo(Boolean(error))}
         />
-        {error && <p className="text-red-600 text-xs mt-2" role="alert">{error}</p>}
-        <button
-          type="submit"
-          disabled={enviando}
-          className="mt-5 w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white font-bold py-3.5 rounded-xl text-sm transition-colors"
-        >
+        {error && (
+          <p className="mt-2 text-[13px] font-medium text-red-600" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={enviando} className={`${boton.primario} mt-5 w-full`}>
           {enviando ? t('comun.procesando') : t('entrar.enviar')}
-          {!enviando && <ArrowRight size={16} />}
         </button>
-        <p className="text-slate-500 text-xs mt-4 text-center">{t('entrar.sinContrasena')}</p>
+        <p className="mt-4 text-[13px] text-negro/60">{t('entrar.sinContrasena')}</p>
       </form>
     )
   }
 
   return (
-    <div className="min-h-screen bg-brand-soft/40 pt-28 pb-20 px-4">
-      <div className="max-w-md mx-auto text-center mb-8">
-        <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-2 block">{t('entrar.etiqueta')}</span>
-        <h1 className="text-3xl sm:text-4xl font-black text-navy mb-3">{t('entrar.titulo')}</h1>
-        <p className="text-slate-600">{t('entrar.subtitulo')}</p>
+    <div className="min-h-screen bg-lavanda/50 pb-24">
+      <EncabezadoPagina etiqueta={t('entrar.etiqueta')} titulo={t('entrar.titulo')} sub={t('entrar.subtitulo')} />
+      <div className={`${contenedor} mt-12 lg:grid lg:grid-cols-12 lg:gap-x-8`}>
+        <div className="max-w-md lg:col-span-5 lg:col-start-4 lg:max-w-none">{contenido}</div>
       </div>
-      {contenido}
     </div>
   )
 }

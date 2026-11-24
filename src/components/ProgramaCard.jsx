@@ -1,15 +1,17 @@
 import { useNavigate } from 'react-router-dom'
-import { Check, ArrowRight, Star } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { seleccion } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { boton } from './estilos'
 
+// Un programa del catálogo en dos presentaciones:
+//  - modo "catalogo": una fila de la lista de precios de la portada.
+//  - modo "cotizador": una fila que se marca o desmarca para armar el paquete.
 export default function ProgramaCard({ programa, seleccionado, onToggle, modo = 'catalogo' }) {
   const navigate = useNavigate()
   const { t, programa: txt } = useIdioma()
-
-  const formatPrecio = (precio, moneda) => {
-    return `$${precio.toLocaleString('es-MX')} ${moneda}`
-  }
+  const precio = `$${programa.precio.toLocaleString('es-MX')}`
+  const sinDosPuntos = (texto) => texto.replace(/:\s*$/, '')
 
   const handleCotizar = () => {
     seleccion.agregar(programa.id)
@@ -18,80 +20,76 @@ export default function ProgramaCard({ programa, seleccionado, onToggle, modo = 
 
   if (modo === 'cotizador') {
     return (
-      <div
+      <button
+        type="button"
         onClick={() => onToggle(programa.id)}
-        className={`relative cursor-pointer rounded-xl border p-5 transition-all duration-200 ${
-          seleccionado
-            ? 'border-brand bg-brand/5 shadow-lg shadow-brand/10'
-            : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100'
+        aria-pressed={Boolean(seleccionado)}
+        className={`group flex w-full items-start gap-4 rounded-md border p-4 text-left transition-colors duration-200 sm:p-5 ${
+          seleccionado ? 'border-violeta bg-lavanda' : 'border-negro/10 bg-white hover:border-negro/30'
         }`}
       >
-        {seleccionado && (
-          <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-brand flex items-center justify-center">
-            <Check size={14} className="text-white" />
-          </div>
-        )}
-        {programa.destacado && (
-          <div className="inline-flex items-center gap-1 bg-brand/15 text-brand text-xs font-medium px-2 py-0.5 rounded-full mb-3">
-            <Star size={10} fill="currentColor" />
-            {t('card.destacado')}
-          </div>
-        )}
-        <h3 className="text-navy font-semibold text-sm mb-1">{programa.nombre}</h3>
-        <p className="text-slate-600 text-xs mb-3 line-clamp-2">{txt(programa, 'descripcion')}</p>
-        <p className="text-brand font-bold text-base">{formatPrecio(programa.precio, programa.moneda)}</p>
-        <p className="text-slate-500 text-xs mt-1">{txt(programa, 'pago')}</p>
-        <span className="inline-block mt-3 text-[10px] font-semibold uppercase tracking-wider text-brand bg-brand/10 px-2 py-0.5 rounded">
-          {t(`tipo.${programa.tipo}`)}
+        {/* Casilla: se llena con el bloque azul al elegir */}
+        <span
+          aria-hidden="true"
+          className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[4px] border-2 transition-colors ${
+            seleccionado ? 'border-violeta bg-violeta text-white' : 'border-negro/20 text-transparent group-hover:border-violeta/60'
+          }`}
+        >
+          <Check size={13} strokeWidth={3} />
         </span>
-      </div>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="text-[15px] font-bold text-negro">{programa.nombre}</span>
+            {programa.destacado && (
+              <span className="rounded-full bg-violeta px-2 py-0.5 text-[11px] font-semibold text-white">{t('card.destacado')}</span>
+            )}
+          </span>
+          <span className="mt-1 block text-sm leading-snug text-negro/70">{txt(programa, 'descripcion')}</span>
+          <span className="mt-2 block text-[13px] text-negro/60">
+            {t(`tipo.${programa.tipo}`)} · {txt(programa, 'pago')}
+          </span>
+        </span>
+        <span className="text-right">
+          <span className="block whitespace-nowrap cifra text-base text-negro">{precio}</span>
+          <span className="block text-xs text-negro/60">{programa.moneda}</span>
+        </span>
+      </button>
     )
   }
 
   return (
-    <div className={`relative rounded-xl border transition-all duration-300 card-hover flex flex-col ${
-      programa.destacado ? 'border-brand/40 bg-gradient-to-b from-brand/5 to-transparent' : 'border-slate-200 bg-slate-50'
-    }`}>
-      {programa.destacado && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-brand text-white text-xs font-bold tracking-wider uppercase px-3 py-1 rounded-full">
-            {t('card.masPopular')}
-          </span>
+    <li className="group grid gap-x-8 gap-y-4 border-b border-negro/10 py-6 transition-colors sm:grid-cols-2 lg:grid-cols-12 lg:items-center">
+      <div className="sm:col-span-2 lg:col-span-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h3 className="titular text-xl text-negro">{programa.nombre}</h3>
+          {programa.destacado && (
+            <span className="rounded-full bg-violeta px-2.5 py-0.5 text-xs font-semibold text-white">{t('card.masPopular')}</span>
+          )}
         </div>
-      )}
+        <p className="mt-1.5 leading-snug text-negro/70">{txt(programa, 'descripcion')}</p>
+      </div>
 
-      <div className="p-6 flex-1 flex flex-col">
-        <h3 className="text-navy font-bold text-lg mb-2">{programa.nombre}</h3>
-        <p className="text-slate-700 text-sm mb-4 leading-relaxed flex-1">{txt(programa, 'descripcion')}</p>
-
-        <div className="space-y-2 mb-6">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 text-xs uppercase tracking-wider">{t('card.paraQuien')}</span>
-            <span className="text-slate-700 text-xs">{txt(programa, 'paraQuien')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 text-xs uppercase tracking-wider">{t('card.pago')}</span>
-            <span className="text-slate-700 text-xs">{txt(programa, 'pago')}</span>
-          </div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:col-span-2 lg:col-span-4">
+        <div>
+          <dt className="text-negro/60">{sinDosPuntos(t('card.paraQuien'))}</dt>
+          <dd className="mt-0.5 font-medium leading-snug text-negro">{txt(programa, 'paraQuien')}</dd>
         </div>
-
-        <div className="border-t border-slate-200 pt-4 mb-5">
-          <span className="text-brand font-black text-2xl">${programa.precio.toLocaleString('es-MX')}</span>
-          <span className="text-slate-600 text-sm ml-1">{programa.moneda}</span>
+        <div>
+          <dt className="text-negro/60">{sinDosPuntos(t('card.pago'))}</dt>
+          <dd className="mt-0.5 font-medium leading-snug text-negro">{txt(programa, 'pago')}</dd>
         </div>
+      </dl>
 
-        <button
-          onClick={handleCotizar}
-          className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
-            programa.destacado
-              ? 'bg-brand hover:bg-brand-dark text-white'
-              : 'border border-brand/40 text-brand hover:bg-brand hover:text-white'
-          }`}
-        >
+      <p className="flex items-baseline gap-1.5 lg:col-span-2 lg:justify-end">
+        <span className="cifra text-2xl text-negro">{precio}</span>
+        <span className="text-sm text-negro/60">{programa.moneda}</span>
+      </p>
+
+      <div className="sm:text-right lg:col-span-2">
+        <button onClick={handleCotizar} className={programa.destacado ? boton.chico : boton.chicoContorno}>
           {t('card.cotizar')}
-          <ArrowRight size={15} />
         </button>
       </div>
-    </div>
+    </li>
   )
 }

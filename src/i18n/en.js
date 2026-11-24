@@ -217,6 +217,21 @@ export default {
     verVideo: 'Watch video testimonial from {autor}',
     foto: 'Photo of {autor}',
     ctaTexto: 'Want results like these?',
+    marcas: 'Brands that already trust us',
+    casos: {
+      etiqueta: 'Results in numbers',
+      titulo: 'Before and after Socius',
+      antes: 'Before',
+      despues: 'After',
+    },
+    voces: {
+      etiqueta: 'In their words',
+      titulo: 'What changed in the way they sell',
+      lista: 'Clients',
+      anterior: 'Previous testimonial',
+      siguiente: 'Next testimonial',
+      contador: '{actual} of {total}',
+    },
   },
 
   footer: {

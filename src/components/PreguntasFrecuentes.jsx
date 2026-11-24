@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { config } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { contenedor } from './estilos'
 
 // Acordeón de preguntas frecuentes. Las preguntas viven en los diccionarios
 // (i18n/es.js y en.js, clave faq.items); los números salen de la configuración.
@@ -16,33 +17,44 @@ export default function PreguntasFrecuentes() {
   const interpolar = (texto) => texto.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? `{${k}}`)
 
   return (
-    <section id="preguntas-frecuentes" className="py-20 px-4 border-t border-slate-200">
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-3xl sm:text-4xl font-black text-navy mb-10">{t('faq.titulo')}</h2>
+    <section id="preguntas-frecuentes" className="py-24 sm:py-32">
+      <div className={contenedor}>
+      <div className="grid gap-y-10 border-t border-negro/10 pt-6 lg:grid-cols-12 lg:gap-x-8">
+        <div className="lg:col-span-3">
+          <h2 className="titular text-[clamp(1.6rem,3vw,2.25rem)] leading-[1.04] text-negro lg:sticky lg:top-28">
+            {t('faq.titulo')}
+          </h2>
+        </div>
 
-        <div className="space-y-2.5">
+        <div className="lg:col-span-8 lg:col-start-5">
           {t('faq.items').map((item, i) => {
             const activa = abierta === i
             const idPanel = `faq-panel-${i}`
             return (
-              <div key={i} className={`rounded-lg transition-colors duration-200 ${activa ? 'bg-brand-soft' : 'bg-slate-50'}`}>
+              <div key={i} className="border-b border-negro/10 first:border-t lg:first:border-t-0">
                 <h3>
                   <button
                     type="button"
                     onClick={() => setAbierta(activa ? null : i)}
                     aria-expanded={activa}
                     aria-controls={idPanel}
-                    className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left text-navy text-base sm:text-lg font-medium rounded-lg hover:bg-brand-soft transition-colors duration-200"
+                    className={`flex w-full items-center justify-between gap-6 py-6 text-left text-lg font-semibold tracking-[-0.01em] transition-colors duration-200 ${
+                      activa ? 'text-violeta' : 'text-negro hover:text-violeta'
+                    }`}
                   >
                     {item.q}
-                    <ChevronRight
-                      size={20}
-                      className={`flex-shrink-0 text-navy transition-transform duration-200 ${activa ? 'rotate-90' : ''}`}
-                    />
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-[transform,background-color,color] duration-300 ${
+                        activa ? 'rotate-45 bg-violeta text-white' : 'bg-lavanda text-violeta'
+                      }`}
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                    </span>
                   </button>
                 </h3>
                 {activa && (
-                  <div id={idPanel} className="px-6 pb-6 -mt-1 text-slate-700 text-sm sm:text-base leading-relaxed animate-fade-in">
+                  <div id={idPanel} className="max-w-2xl pb-7 pr-12 leading-relaxed text-negro/70 animate-aparece">
                     {interpolar(item.a)}
                   </div>
                 )}
@@ -50,6 +62,7 @@ export default function PreguntasFrecuentes() {
             )
           })}
         </div>
+      </div>
       </div>
     </section>
   )

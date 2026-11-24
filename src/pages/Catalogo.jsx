@@ -1,17 +1,18 @@
 import { useNavigate } from 'react-router-dom'
-import { Check, ArrowRight, Info } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { programas } from '../data/programas'
 import { seleccion } from '../core'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { Bloque, EncabezadoPagina } from '../components/Lamina'
+import { boton, contenedor } from '../components/estilos'
 
+// Tipo de programa → etiqueta. Todas en la familia de azules de la marca.
+const tipoDe = (id) => (id.includes('split') ? 'split' : id === 'avi' ? 'formativo' : id.includes('ia') ? 'ia' : 'completo')
 const coloresTag = {
-  'nexus-growth': 'bg-blue-500/10 text-blue-700',
-  'nexus-growth-split': 'bg-blue-500/10 text-blue-700',
-  'nexus-partner': 'bg-purple-500/10 text-purple-700',
-  'nexus-partner-split': 'bg-purple-500/10 text-purple-700',
-  'socius-core': 'bg-brand/10 text-brand',
-  'nexus-ia': 'bg-green-500/10 text-green-700',
-  'avi': 'bg-pink-500/10 text-pink-700',
+  completo: 'bg-negro text-white',
+  split: 'bg-lavanda text-violeta',
+  ia: 'bg-cian text-negro', // cian = acento de IA
+  formativo: 'border border-violeta/30 text-violeta',
 }
 
 export default function Catalogo() {
@@ -24,96 +25,76 @@ export default function Catalogo() {
   }
 
   return (
-    <div className="min-h-screen bg-white pt-24 pb-20 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <span className="text-brand text-xs font-semibold uppercase tracking-widest mb-3 block">{t('catalogo.etiqueta')}</span>
-          <h1 className="text-4xl sm:text-5xl font-black text-navy mb-4">{t('catalogo.titulo')}</h1>
-          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
-            {t('catalogo.subtitulo')}
-          </p>
-        </div>
+    <div className="min-h-screen bg-white pb-24">
+      <EncabezadoPagina etiqueta={t('catalogo.etiqueta')} titulo={t('catalogo.titulo')} sub={t('catalogo.subtitulo')} />
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-16">
-          {programas.map((p) => (
-            <div
-              key={p.id}
-              className={`relative rounded-2xl border flex flex-col overflow-hidden transition-all duration-300 hover:scale-[1.01] ${
-                p.destacado ? 'border-brand/30 shadow-lg shadow-brand/5' : 'border-slate-200'
-              }`}
-            >
-              {p.destacado && (
-                <div className="bg-brand text-white text-xs font-bold tracking-widest uppercase text-center py-2">
-                  {t('card.masPopular')}
-                </div>
-              )}
-
-              <div className={`flex-1 flex flex-col p-6 ${p.destacado ? 'bg-gradient-to-b from-brand/5 to-white' : 'bg-white shadow-sm'}`}>
-                {/* Tag */}
-                <span className={`inline-block text-xs font-medium px-2.5 py-1 rounded-full mb-4 w-fit ${coloresTag[p.id] || 'bg-slate-100 text-slate-700'}`}>
-                  {t(`catalogo.tags.${p.id.includes('split') ? 'split' : p.id === 'avi' ? 'formativo' : p.id.includes('ia') ? 'ia' : 'completo'}`)}
+      {/* Fichas técnicas: una por programa */}
+      <div className={`${contenedor} mt-16`}>
+        {programas.map((p) => {
+          const tipo = tipoDe(p.id)
+          return (
+            <article key={p.id} className="grid gap-y-6 border-t border-negro/10 py-10 lg:grid-cols-12 lg:gap-x-8">
+              {/* Clasificación al margen */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:col-span-3 lg:flex-col lg:items-start">
+                <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${coloresTag[tipo]}`}>
+                  {t(`catalogo.tags.${tipo}`)}
                 </span>
+                {p.destacado && (
+                  <span className="flex items-center gap-2 text-sm font-semibold text-violeta">
+                    <Bloque />
+                    {t('card.masPopular')}
+                  </span>
+                )}
+              </div>
 
-                <h2 className="text-navy font-black text-xl mb-2">{p.nombre}</h2>
-                <p className="text-slate-700 text-sm leading-relaxed mb-5">{txt(p, 'descripcion')}</p>
+              {/* Qué es y para quién */}
+              <div className="lg:col-span-3">
+                <h2 className="titular text-[1.75rem] leading-none text-negro">{p.nombre}</h2>
+                <p className="mt-3 leading-relaxed text-negro/70">{txt(p, 'descripcion')}</p>
+                <p className="mt-5 text-sm text-negro/60">{t('catalogo.idealPara')}</p>
+                <p className="mt-1 font-medium leading-snug text-negro">{txt(p, 'paraQuien')}</p>
+              </div>
 
-                {/* Para quién */}
-                <div className="bg-slate-50 rounded-lg p-3 mb-5 flex items-start gap-2">
-                  <Info size={14} className="text-brand mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-slate-500 text-xs uppercase tracking-wider mb-1">{t('catalogo.idealPara')}</p>
-                    <p className="text-slate-700 text-xs">{txt(p, 'paraQuien')}</p>
-                  </div>
+              {/* Qué incluye */}
+              <ul className="space-y-2.5 lg:col-span-3">
+                {(t(`catalogo.features.${p.id}`) || []).map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-[15px] text-negro/80">
+                    <Check size={16} aria-hidden="true" className="mt-0.5 flex-shrink-0 text-violeta" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Precio */}
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between lg:col-span-3 lg:flex-col lg:items-stretch lg:justify-start">
+                <div>
+                  <p className="flex items-baseline gap-1.5">
+                    <span className="cifra text-4xl text-negro">${p.precio.toLocaleString('es-MX')}</span>
+                    <span className="text-sm text-negro/60">{p.moneda}</span>
+                  </p>
+                  <p className="mt-1 text-sm text-negro/60">{txt(p, 'pago')}</p>
                 </div>
-
-                {/* Features */}
-                <ul className="space-y-2 mb-6 flex-1">
-                  {(t(`catalogo.features.${p.id}`) || []).map((f) => (
-                    <li key={f} className="flex items-center gap-2">
-                      <Check size={13} className="text-brand flex-shrink-0" />
-                      <span className="text-slate-700 text-xs">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Price */}
-                <div className="border-t border-slate-200 pt-4 mb-5">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-brand font-black text-3xl">${p.precio.toLocaleString('es-MX')}</span>
-                    <span className="text-slate-500 text-sm">{p.moneda}</span>
-                  </div>
-                  <p className="text-slate-500 text-xs mt-1">{txt(p, 'pago')}</p>
-                </div>
-
-                <button
-                  onClick={() => handleSeleccionar(p.id)}
-                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
-                    p.destacado
-                      ? 'bg-brand hover:bg-brand-dark text-white'
-                      : 'border border-brand/30 text-brand hover:bg-brand hover:text-white'
-                  }`}
-                >
+                <button onClick={() => handleSeleccionar(p.id)} className={`${p.destacado ? boton.primario : boton.secundario} w-full sm:w-auto lg:w-full`}>
                   {t('catalogo.seleccionar')}
-                  <ArrowRight size={15} />
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
+            </article>
+          )
+        })}
 
-        {/* Comparison note */}
-        <div className="max-w-2xl mx-auto text-center p-6 rounded-2xl border border-slate-200 bg-slate-50">
-          <p className="text-slate-600 text-sm">
-            {t('catalogo.noSabes')} <span className="text-brand">{t('catalogo.agendaUna')}</span> {t('catalogo.noSabesFin')}
-          </p>
-          <button
-            onClick={() => navigate('/agenda')}
-            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand hover:text-brand-dark transition-colors"
-          >
-            {t('comun.hablarEstratega')} <ArrowRight size={14} />
-          </button>
+        {/* ¿No sabes cuál elegir? */}
+        <div className="grid gap-y-6 border-t-2 border-negro pt-10 lg:grid-cols-12 lg:gap-x-8">
+          <div className="lg:col-span-6 lg:col-start-4">
+            <p className="text-xl leading-snug text-negro sm:text-2xl">
+              <span className="font-bold">{t('catalogo.noSabes')}</span> <span className="text-violeta">{t('catalogo.agendaUna')}</span>{' '}
+              {t('catalogo.noSabesFin')}
+            </p>
+          </div>
+          <div className="lg:col-span-3 lg:text-right">
+            <button onClick={() => navigate('/agenda')} className={boton.chico}>
+              {t('comun.hablarEstratega')}
+            </button>
+          </div>
         </div>
       </div>
     </div>

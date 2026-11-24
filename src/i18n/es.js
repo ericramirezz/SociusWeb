@@ -187,6 +187,21 @@ export default {
     verVideo: 'Ver video testimonio de {autor}',
     foto: 'Foto de {autor}',
     ctaTexto: '¿Quieres resultados como estos?',
+    marcas: 'Marcas que ya confían',
+    casos: {
+      etiqueta: 'Casos con cifras',
+      titulo: 'Antes y después de Socius',
+      antes: 'Antes',
+      despues: 'Después',
+    },
+    voces: {
+      etiqueta: 'En sus palabras',
+      titulo: 'Lo que cambió en su forma de vender',
+      lista: 'Clientes',
+      anterior: 'Testimonio anterior',
+      siguiente: 'Siguiente testimonio',
+      contador: '{actual} de {total}',
+    },
   },
 
   footer: {

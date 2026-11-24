@@ -1,112 +1,110 @@
 import { Link } from 'react-router-dom'
 import { Instagram, Linkedin, Twitter, Mail } from 'lucide-react'
 import { useIdioma } from '../i18n/IdiomaContext'
+import { boton, contenedor } from './estilos'
+import Logo from './Logo'
+
+const REDES = [
+  { href: 'https://instagram.com', nombre: 'Instagram', Icono: Instagram },
+  { href: 'https://linkedin.com', nombre: 'LinkedIn', Icono: Linkedin },
+  { href: 'https://twitter.com', nombre: 'Twitter', Icono: Twitter },
+]
+
+function Columna({ titulo, children }) {
+  return (
+    <div>
+      <h2 className="mb-5 text-sm font-medium text-white/50">{titulo}</h2>
+      {children}
+    </div>
+  )
+}
+
+const enlace = 'text-[15px] text-white/80 transition-colors duration-200 hover:text-white'
 
 export default function Footer() {
   const { t } = useIdioma()
   return (
-    <footer className="bg-white border-t border-slate-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-          {/* Brand */}
-          <div className="md:col-span-1">
-            <span className="text-3xl font-black tracking-widest text-brand">SOCIUS</span>
-            <p className="mt-3 text-slate-600 text-sm leading-relaxed">
-              {t('footer.descripcion')}
-            </p>
-            <p className="mt-2 text-brand text-sm font-semibold">{t('footer.lema')}</p>
-            <div className="flex items-center gap-3 mt-5">
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:text-brand hover:border-brand/40 transition-all duration-200"
-              >
-                <Instagram size={15} />
-              </a>
-              <a
-                href="https://linkedin.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:text-brand hover:border-brand/40 transition-all duration-200"
-              >
-                <Linkedin size={15} />
-              </a>
-              <a
-                href="https://twitter.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:text-brand hover:border-brand/40 transition-all duration-200"
-              >
-                <Twitter size={15} />
-              </a>
-            </div>
-          </div>
-
-          {/* Nav */}
-          <div>
-            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.navegacion')}</h4>
-            <ul className="space-y-2">
-              {[
-                { label: t('nav.inicio'), href: '/' },
-                { label: t('nav.programas'), href: '/catalogo' },
-                { label: t('nav.testimonios'), href: '/testimonios' },
-                { label: t('nav.cotizador'), href: '/cotizador' },
-                { label: t('nav.pedidos'), href: '/pedidos' },
-              ].map((l) => (
-                <li key={l.href}>
-                  <Link to={l.href} className="text-sm text-slate-700 hover:text-brand transition-colors duration-200">
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Programs */}
-          <div>
-            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.programas')}</h4>
-            <ul className="space-y-2">
-              {['Nexus Growth', 'Nexus Partner', 'Socius Core', 'Nexus IA', 'AVI'].map((p) => (
-                <li key={p}>
-                  <Link to="/catalogo" className="text-sm text-slate-700 hover:text-brand transition-colors duration-200">
-                    {p}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h4 className="text-xs font-semibold tracking-widest text-slate-500 uppercase mb-4">{t('footer.contacto')}</h4>
-            <ul className="space-y-3">
-              <li>
-                <a href="mailto:admin@sociusrealestate.com" className="flex items-center gap-2 text-sm text-slate-700 hover:text-brand transition-colors duration-200">
-                  <Mail size={14} />
-                  admin@sociusrealestate.com
+    <footer className="bg-negro text-white">
+      <div className={`${contenedor} pb-10 pt-20`}>
+        <div className="grid grid-cols-2 gap-x-8 gap-y-12 lg:grid-cols-12">
+          {/* Marca */}
+          <div className="col-span-2 lg:col-span-5">
+            <Logo variante="blanco" className="h-10" />
+            <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-white/70">{t('footer.descripcion')}</p>
+            <p className="mt-3 text-[15px] font-semibold text-cian">{t('footer.lema')}</p>
+            <div className="mt-8 flex items-center gap-2">
+              {REDES.map(({ href, nombre, Icono }) => (
+                <a
+                  key={nombre}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={nombre}
+                  className="flex h-10 w-10 items-center justify-center rounded-md border border-white/15 text-white/70 transition-colors duration-200 hover:border-white hover:text-white"
+                >
+                  <Icono size={16} aria-hidden="true" />
                 </a>
-
-              </li>
-            </ul>
-            <div className="mt-6">
-              <Link
-                to="/agenda"
-                className="inline-block bg-brand hover:bg-brand-dark text-white text-xs font-bold tracking-wider uppercase px-5 py-2.5 rounded-md transition-all duration-200"
-              >
-                {t('nav.cta')}
-              </Link>
+              ))}
             </div>
+          </div>
+
+          {/* Navegación */}
+          <div className="lg:col-span-2">
+            <Columna titulo={t('footer.navegacion')}>
+              <ul className="space-y-3">
+                {[
+                  { label: t('nav.inicio'), href: '/' },
+                  { label: t('nav.programas'), href: '/catalogo' },
+                  { label: t('nav.testimonios'), href: '/testimonios' },
+                  { label: t('nav.cotizador'), href: '/cotizador' },
+                  { label: t('nav.pedidos'), href: '/pedidos' },
+                ].map((l) => (
+                  <li key={l.href}>
+                    <Link to={l.href} className={enlace}>
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Columna>
+          </div>
+
+          {/* Programas */}
+          <div className="lg:col-span-2">
+            <Columna titulo={t('footer.programas')}>
+              <ul className="space-y-3">
+                {['Nexus Growth', 'Nexus Partner', 'Socius Core', 'Nexus IA', 'AVI'].map((p) => (
+                  <li key={p}>
+                    <Link to="/catalogo" className={enlace}>
+                      {p}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Columna>
+          </div>
+
+          {/* Contacto */}
+          <div className="col-span-2 lg:col-span-3">
+            <Columna titulo={t('footer.contacto')}>
+              <a href="mailto:admin@sociusrealestate.com" className={`${enlace} inline-flex items-center gap-2 break-all`}>
+                <Mail size={15} aria-hidden="true" className="flex-shrink-0" />
+                admin@sociusrealestate.com
+              </a>
+              <div className="mt-6">
+                <Link to="/agenda" className={`${boton.claro} px-5 py-3 text-sm`}>
+                  {t('nav.cta')}
+                </Link>
+              </div>
+            </Columna>
           </div>
         </div>
 
-        <div className="mt-12 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-slate-400">
+        <div className="mt-16 flex flex-col gap-3 border-t border-white/10 pt-6 text-[13px] text-white/50 sm:flex-row sm:items-center sm:justify-between">
+          <p>
             © {new Date().getFullYear()} Socius Real Estate Consulting. {t('footer.derechos')}
           </p>
-          <p className="text-xs text-slate-400">
-            {t('footer.hechoEn')}
-          </p>
+          <p>{t('footer.hechoEn')}</p>
         </div>
       </div>
     </footer>
